@@ -1,3 +1,12 @@
+#Coding env
+*/.DS_Store
+
+#Static files
+csv_output/*
+Datasets/*
+q_table/*
+training/*
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
