@@ -1,0 +1,165 @@
+from __future__ import annotations
+
+from collections.abc import Mapping
+from typing import Any
+
+from flask import Flask, jsonify, render_template, request
+from flask_socketio import SocketIO
+from jinja2 import TemplateNotFound
+
+from lahso.web.jobs import BackgroundJobRunner
+from lahso.web.services import (
+    compare_result_files,
+    configure_implementation,
+    configure_training,
+    get_default_config_payload,
+    validate_dataset,
+)
+from lahso.web.state import SessionStore
+
+
+def register_routes(
+    app: Flask,
+    socketio: SocketIO,
+    session_store: SessionStore,
+    job_runner: BackgroundJobRunner,
+) -> None:
+    @app.route("/")
+    def index():
+        try:
+            return render_template("index.html")
+        except TemplateNotFound:
+            return "HTML template not found. Please create templates/index.html", 404
+
+    @app.route("/api/config/default", methods=["GET"])
+    def get_default_config():
+        try:
+            return jsonify(get_default_config_payload())
+        except Exception as exc:
+            return _json_error(exc)
+
+    @app.route("/api/dataset/validate", methods=["POST"])
+    def validate_dataset_route():
+        try:
+            lahso_session = session_store.get_for_current_request()
+            return jsonify(validate_dataset(_json_payload(), lahso_session))
+        except Exception as exc:
+            return _json_error(exc)
+
+    @app.route("/api/training/configure", methods=["POST"])
+    def configure_training_route():
+        try:
+            lahso_session = session_store.get_for_current_request()
+            return jsonify(configure_training(_json_payload(), lahso_session))
+        except Exception as exc:
+            return _json_error(exc)
+
+    @app.route("/api/training/start", methods=["POST"])
+    def start_training():
+        try:
+            lahso_session = session_store.get_for_current_request()
+
+            if lahso_session.training_active:
+                return jsonify({"success": False, "error": "Training already active"})
+
+            lahso_session.training_active = True
+            lahso_session.training_paused = False
+            lahso_session.current_episode = 0
+
+            job_runner.start_training(session_store, socketio, lahso_session.session_id)
+
+            return jsonify(
+                {
+                    "success": True,
+                    "message": "Training started",
+                    "session_id": lahso_session.session_id,
+                }
+            )
+        except Exception as exc:
+            return _json_error(exc)
+
+    @app.route("/api/training/pause", methods=["POST"])
+    def pause_training():
+        try:
+            lahso_session = session_store.get_for_current_request()
+            lahso_session.training_paused = True
+
+            return jsonify({"success": True, "message": "Training paused"})
+        except Exception as exc:
+            return _json_error(exc)
+
+    @app.route("/api/training/resume", methods=["POST"])
+    def resume_training():
+        try:
+            lahso_session = session_store.get_for_current_request()
+
+            if not lahso_session.training_active:
+                return jsonify(
+                    {"success": False, "error": "No training session active"}
+                )
+
+            lahso_session.training_paused = False
+
+            return jsonify({"success": True, "message": "Training resumed"})
+        except Exception as exc:
+            return _json_error(exc)
+
+    @app.route("/api/training/stop", methods=["POST"])
+    def stop_training():
+        try:
+            lahso_session = session_store.get_for_current_request()
+            lahso_session.training_active = False
+            lahso_session.training_paused = False
+
+            return jsonify({"success": True, "message": "Training stopped"})
+        except Exception as exc:
+            return _json_error(exc)
+
+    @app.route("/api/implementation/configure", methods=["POST"])
+    def configure_implementation_route():
+        try:
+            lahso_session = session_store.get_for_current_request()
+            return jsonify(configure_implementation(_json_payload(), lahso_session))
+        except Exception as exc:
+            return _json_error(exc)
+
+    @app.route("/api/implementation/execute", methods=["POST"])
+    def execute_implementation():
+        try:
+            lahso_session = session_store.get_for_current_request()
+
+            if lahso_session.simulation_active:
+                return jsonify({"success": False, "error": "Simulation already active"})
+
+            lahso_session.simulation_active = True
+
+            job_runner.start_simulation(
+                session_store,
+                socketio,
+                lahso_session.session_id,
+            )
+
+            return jsonify(
+                {
+                    "success": True,
+                    "message": "Simulation started",
+                    "session_id": lahso_session.session_id,
+                }
+            )
+        except Exception as exc:
+            return _json_error(exc)
+
+    @app.route("/api/comparison/compare", methods=["POST"])
+    def compare_results():
+        try:
+            return jsonify(compare_result_files(_json_payload()))
+        except Exception as exc:
+            return _json_error(exc)
+
+
+def _json_payload() -> Mapping[str, Any]:
+    return request.get_json(silent=True) or {}
+
+
+def _json_error(exc: Exception):
+    return jsonify({"success": False, "error": str(exc)}), 500

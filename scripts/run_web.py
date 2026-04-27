@@ -95,7 +95,9 @@ def start_application():
     print("📊 All LAHSO functionality integrated")
     print("🛑 Press Ctrl+C to stop")
     
-    from app import app, socketio
+    from lahso.web import create_app, socketio
+
+    app = create_app()
     socketio.run(app, host='0.0.0.0', port=5001, debug=False)
 
 if __name__ == '__main__':

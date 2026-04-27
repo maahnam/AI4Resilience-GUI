@@ -42,7 +42,7 @@ AI4Resilience-GUI/
 Run the repository smoke suite with:
 
 ```bash
-pytest tests/test_smoke_repo_layout.py -q
+pytest tests/test_smoke_repo_layout.py tests/test_smoke_web_backend.py -q
 ```
 
 The smoke tests verify:
@@ -50,6 +50,8 @@ The smoke tests verify:
 - default path resolution for the reorganized repository
 - generation of processed path data
 - loading `ModelInput` end-to-end from the new layout
+- Flask app creation, the current HTML shell, default config JSON, and Socket.IO
+  session creation
 
 ## Notes For Further Cleanup
 
