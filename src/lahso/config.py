@@ -1,6 +1,22 @@
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from lahso.paths import (
+    PROCESSED_KBEST_DIR,
+    PROCESSED_PATHS_DIR,
+    Q_TABLES_DIR,
+    RAW_COSTS_DIR,
+    RAW_DATA_DIR,
+    RAW_DEMAND_DIR,
+    RAW_DISRUPTIONS_DIR,
+    RUNS_DIR,
+    SERVICE_LOGS_DIR,
+    SHIPMENT_LOGS_DIR,
+    SIMULATION_OUTPUTS_DIR,
+    TRAINING_METRICS_DIR,
+    ensure_directories,
+)
+
 
 @dataclass
 class Config:
@@ -28,8 +44,8 @@ class Config:
     extract_q_table: int = 5000
 
     # paths
-    data_path: Path = Path("Datasets")
-    disruption_path: Path = Path("Datasets/Disruption_Profiles")
+    data_path: Path = RAW_DATA_DIR
+    disruption_path: Path = RAW_DISRUPTIONS_DIR
 
     # Input file names (fn)
     ## Service Network
@@ -65,6 +81,9 @@ class Config:
     # Training Path
     tc_path: Path = field(init=False)
     tr_path: Path = field(init=False)
+    training_output_path: Path = field(init=False)
+    shipment_logs_dir: Path = field(init=False)
+    service_logs_dir: Path = field(init=False)
 
     # Dataset for path user
     # path = ....
@@ -134,39 +153,54 @@ class Config:
             if self.apply_d_disruption
             else "No_Request_Disruption_Profile.csv"
         )
-        self.tc_path = Path(f"training/{self.tc_name}")
-        self.tr_path = Path(f"training/{self.tr_name}")
-        
+        ensure_directories(
+            PROCESSED_PATHS_DIR,
+            PROCESSED_KBEST_DIR,
+            Q_TABLES_DIR,
+            TRAINING_METRICS_DIR,
+            RUNS_DIR,
+            SHIPMENT_LOGS_DIR,
+            SERVICE_LOGS_DIR,
+            SIMULATION_OUTPUTS_DIR,
+        )
+        self.tc_path = TRAINING_METRICS_DIR / self.tc_name
+        self.tr_path = TRAINING_METRICS_DIR / self.tr_name
+        self.training_output_path = TRAINING_METRICS_DIR / self.training_output
+        self.shipment_logs_dir = SHIPMENT_LOGS_DIR
+        self.service_logs_dir = SERVICE_LOGS_DIR
+
         if self.q_table_path is None:
-            self.q_table_path = Path(f"q_table/{self.q_name}")
+            self.q_table_path = Q_TABLES_DIR / self.q_name
 
         if self.network_path is None:
-            self.network_path = self.data_path / self.network_fn
+            self.network_path = RAW_DATA_DIR / "network" / self.network_fn
         if self.network_barge_path is None:
-            self.network_barge_path = self.data_path / self.network_barge_fn
+            self.network_barge_path = RAW_DATA_DIR / "network" / self.network_barge_fn
         if self.network_train_path is None:
-            self.network_train_path = self.data_path / self.network_train_fn
+            self.network_train_path = RAW_DATA_DIR / "network" / self.network_train_fn
         if self.network_truck_path is None:
-            self.network_truck_path = self.data_path / self.network_truck_fn
+            self.network_truck_path = RAW_DATA_DIR / "network" / self.network_truck_fn
 
         if self.possible_paths_path is None:
-            self.possible_paths_path = self.data_path / self.possible_paths_fn
+            self.possible_paths_path = PROCESSED_PATHS_DIR / self.possible_paths_fn
 
         if self.fixed_service_schedule_path is None:
             self.fixed_service_schedule_path = (
-                self.data_path / self.fixed_service_schedule_fn
+                RAW_DATA_DIR / "schedules" / self.fixed_service_schedule_fn
             )
         if self.truck_schedule_path is None:
-            self.truck_schedule_path = self.data_path / self.truck_schedule_fn
+            self.truck_schedule_path = RAW_DATA_DIR / "schedules" / self.truck_schedule_fn
         if self.mode_costs_path is None:
-            self.mode_costs_path = self.data_path / self.mode_costs_fn
+            self.mode_costs_path = RAW_COSTS_DIR / self.mode_costs_fn
 
         if self.demand_default_path is None:
-            self.demand_default_path = self.data_path / f"{self.request_fn}_default.csv"
+            self.demand_default_path = RAW_DEMAND_DIR / f"{self.request_fn}_default.csv"
         if self.demand_planned_path is None:
-            self.demand_planned_path = self.data_path / f"{self.request_fn}_planned.csv"
+            self.demand_planned_path = RAW_DEMAND_DIR / f"{self.request_fn}_planned.csv"
         if self.demand_kbest_path is None:
-            self.demand_kbest_path = self.data_path / f"{self.request_fn}_kbest.csv"
+            self.demand_kbest_path = (
+                PROCESSED_KBEST_DIR / f"{self.demand_default_path.stem}_kbest.csv"
+            )
 
         if self.s_disruption_path is None:
             self.s_disruption_path = self.disruption_path / self.s_disruption_fn
@@ -174,4 +208,12 @@ class Config:
             self.d_disruption_path = self.disruption_path / self.d_disruption_fn
 
         if self.output_path is None:
-            self.output_path = Path("csv_output") / f"{self.policy_name}_{self.number_of_simulation}.csv"
+            self.output_path = (
+                SIMULATION_OUTPUTS_DIR
+                / f"{self.policy_name}_{self.number_of_simulation}.csv"
+            )
+
+    def q_table_checkpoint_path(self, episode: int) -> Path:
+        return self.q_table_path.with_name(
+            f"{self.q_table_path.stem}_{episode}{self.q_table_path.suffix}"
+        )

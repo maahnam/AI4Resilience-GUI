@@ -335,6 +335,7 @@ def service_to_path(config, output_postfix=""):
         TRANSSHIPMENT_COST_TRUCK,
     )
 
+    config.possible_paths_path.parent.mkdir(parents=True, exist_ok=True)
     new_df.to_csv(
         config.possible_paths_path.with_stem(
             f"{config.possible_paths_path.stem}{output_postfix}"

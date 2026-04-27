@@ -9,6 +9,13 @@ import gradio as gr
 
 from lahso.config import Config
 from lahso.kbest import kbest
+from lahso.paths import (
+    PROCESSED_KBEST_DIR,
+    RAW_COSTS_DIR,
+    RAW_DEMAND_DIR,
+    RAW_NETWORK_DIR,
+    RAW_SCHEDULES_DIR,
+)
 from lahso.service_to_path import service_to_path
 from lahso.ui.execution_status import ExecutionStatus
 
@@ -106,8 +113,9 @@ def compute_with_dataset_input(
         delay_penalty=int(delay_penalty),
         undelivered_penalty=int(undelivered_penalty),
     )
-    config.demand_kbest_path = config.demand_default_path.with_stem(
+    config.demand_kbest_path = PROCESSED_KBEST_DIR / (
         f"{config.demand_default_path.stem}_kbest"
+        f"{config.demand_default_path.suffix}"
     )
     service_to_path(config)
     if compute_k_best:
@@ -133,44 +141,46 @@ def render_dataset_input_tab():
                     label="Intermodal Network",
                     file_types=[".csv"],
                     height=100,
-                    value="Datasets/Network.csv",
+                    value=str((RAW_NETWORK_DIR / "Network.csv").absolute()),
                 )
                 network_barge_input = gr.File(
                     label="Barge Network",
                     file_types=[".csv"],
                     height=100,
-                    value=str(Path("Datasets/Network_Barge.csv").absolute()),
+                    value=str((RAW_NETWORK_DIR / "Network_Barge.csv").absolute()),
                 )
                 network_train_input = gr.File(
                     label="Train Network",
                     file_types=[".csv"],
                     height=100,
-                    value=str(Path("Datasets/Network_Train.csv").absolute()),
+                    value=str((RAW_NETWORK_DIR / "Network_Train.csv").absolute()),
                 )
                 network_truck_input = gr.File(
                     label="Truck Network",
                     file_types=[".csv"],
                     height=100,
-                    value=str(Path("Datasets/Network_Truck.csv").absolute()),
+                    value=str((RAW_NETWORK_DIR / "Network_Truck.csv").absolute()),
                 )
                 fixed_schedule_service_input = gr.File(
                     label="Fixed Schedule Service",
                     file_types=[".csv"],
                     height=100,
-                    value=str(Path("Datasets/Fixed Vehicle Schedule.csv").absolute()),
+                    value=str(
+                        (RAW_SCHEDULES_DIR / "Fixed Vehicle Schedule.csv").absolute()
+                    ),
                 )
                 truck_service_input = gr.File(
                     label="Truck Service",
                     file_types=[".csv"],
                     height=100,
-                    value=str(Path("Datasets/Truck Schedule.csv").absolute()),
+                    value=str((RAW_SCHEDULES_DIR / "Truck Schedule.csv").absolute()),
                 )
                 demand_input = gr.File(
                     label="Demand",
                     file_types=[".csv"],
                     height=100,
                     value=str(
-                        Path("Datasets/shipment_requests_200_3w_default.csv").absolute()
+                        (RAW_DEMAND_DIR / "shipment_requests_200_3w_default.csv").absolute()
                     ),
                 )
             with gr.Column():
@@ -179,7 +189,7 @@ def render_dataset_input_tab():
                     label="Mode Related Costs",
                     file_types=[".csv"],
                     height=100,
-                    value=str(Path("Datasets/Mode Costs.csv").absolute()),
+                    value=str((RAW_COSTS_DIR / "Mode Costs.csv").absolute()),
                 )
                 storage_cost_input = gr.Number(
                     label="Storage Cost",

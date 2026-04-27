@@ -1,5 +1,6 @@
 import sys
 import time
+from pathlib import Path
 
 import numpy as np
 import simpy as sim
@@ -32,7 +33,7 @@ def model_implementation(config, model_input):
     # Redirect print statements to a file
     if config.print_event_enabled:
         # Ignoring lint complaint about opening file in a context (with statement)
-        sys.stdout = open(r"csv_output\simulation_logs.txt", "w")  # noqa: SIM115
+        sys.stdout = open(config.output_path.parent / "simulation_logs.txt", "w")  # noqa: SIM115
 
     if config.random_seed:
         print_event(config.print_event_enabled, "Random seed is enabled")
@@ -336,6 +337,7 @@ def model_implementation(config, model_input):
                         config.sd,
                         config.policy_name,
                         config.number_of_simulation,
+                        config,
                     )
             eps_end_time = time.time()  # To measure the runtime
             eps_time = eps_end_time - eps_start_time
@@ -352,6 +354,7 @@ def model_implementation(config, model_input):
     # Create output dataframe
     output = statistics.dataframe(total_cost_plot, total_reward_plot)
     if config.extract_shipment_output:
+        config.output_path.parent.mkdir(parents=True, exist_ok=True)
         output.to_csv(config.output_path, index=False)
 
     yield output

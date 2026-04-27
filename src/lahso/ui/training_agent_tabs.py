@@ -12,6 +12,7 @@ import pandas as pd
 from lahso.config import Config
 from lahso.model_input import ModelInput
 from lahso.model_train import model_train
+from lahso.paths import Q_TABLES_DIR, RAW_DISRUPTIONS_DIR, TRAINING_METRICS_DIR
 from lahso.ui.dataset_input_tab import (
     compute_with_dataset_input,
     dataset_input_next,
@@ -43,9 +44,7 @@ def training_agent_tabs():
                         file_types=[".csv"],
                         height=100,
                         value=str(
-                            Path(
-                                "Datasets/Disruption_Profiles/No_Service_Disruption_Profile.csv"
-                            ).absolute()
+                            (RAW_DISRUPTIONS_DIR / "No_Service_Disruption_Profile.csv").absolute()
                         ),
                     )
                     demand_disruptions_input = gr.File(
@@ -53,9 +52,7 @@ def training_agent_tabs():
                         file_types=[".csv"],
                         height=100,
                         value=str(
-                            Path(
-                                "Datasets/Disruption_Profiles/No_Request_Disruption_Profile.csv"
-                            ).absolute()
+                            (RAW_DISRUPTIONS_DIR / "No_Request_Disruption_Profile.csv").absolute()
                         ),
                     )
                     gr.Markdown("## Learning Agent Settings")
@@ -88,7 +85,7 @@ def training_agent_tabs():
                         label="Continue from previous training?",
                         value=False,
                     )
-                    p = Path("q_table/default_q_table_output.pkl")
+                    p = Q_TABLES_DIR / "default_q_table_output.pkl"
                     last_q_table_input = gr.File(
                         label="Last Q-Table",
                         file_types=[".pkl"],
@@ -97,7 +94,7 @@ def training_agent_tabs():
                         visible=False,
                         value=str(p) if p.exists() else None,
                     )
-                    p = Path("training/default_total_cost_output.pkl")
+                    p = TRAINING_METRICS_DIR / "default_total_cost_output.pkl"
                     last_total_cost_input = gr.File(
                         label="Last Total Cost",
                         file_types=[".pkl"],
@@ -106,7 +103,7 @@ def training_agent_tabs():
                         visible=False,
                         value=str(p) if p.exists() else None,
                     )
-                    p = Path("training/default_total_reward_output.pkl")
+                    p = TRAINING_METRICS_DIR / "default_total_reward_output.pkl"
                     last_reward_input = gr.File(
                         label="Last Reward",
                         file_types=[".pkl"],
@@ -407,8 +404,8 @@ def training_agent_tabs():
             #       a __post_init__ method that derives more fields from the ones you
             #       set. See model_implementation_tab.py def check_simulation_settings
             #       for an example.
-            config.service_disruptions = Path(service_disruptions)
-            config.demand_disruptions = Path(demand_disruptions)
+            config.s_disruption_path = Path(service_disruptions)
+            config.d_disruption_path = Path(demand_disruptions)
             config.alpha = learning_rate
             config.epsilon = exploratory_rate
             config.number_of_simulation = no_of_simulations
@@ -421,9 +418,9 @@ def training_agent_tabs():
                 config.tc_path = Path(last_total_cost)
                 config.tr_path = Path(last_reward)
             else:
-                config.q_table_path = Path("q_table/default_q_table_output.pkl")
-                config.tc_path = Path("training/default_total_cost_output.pkl")
-                config.tr_path = Path("training/default_total_reward_output.pkl")
+                config.q_table_path = Q_TABLES_DIR / "default_q_table_output.pkl"
+                config.tc_path = TRAINING_METRICS_DIR / "default_total_cost_output.pkl"
+                config.tr_path = TRAINING_METRICS_DIR / "default_total_reward_output.pkl"
 
             print(config)
 

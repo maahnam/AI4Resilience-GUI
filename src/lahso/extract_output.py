@@ -3,6 +3,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from lahso.paths import SERVICE_LOGS_DIR, SHIPMENT_LOGS_DIR
+
 
 def shipment_logs(
     shipment_dict,
@@ -16,6 +18,7 @@ def shipment_logs(
     sd,
     policy_name,
     sim_nr,
+    config=None,
 ):
     dfs = []
 
@@ -74,8 +77,8 @@ def shipment_logs(
     )
 
     folder_name = f"{sd}_{sim_nr}"
-    folder_path_1 = Path("shipment_logs")
-    folder_path_2 = Path("service_logs")
+    folder_path_1 = config.shipment_logs_dir if config else SHIPMENT_LOGS_DIR
+    folder_path_2 = config.service_logs_dir if config else SERVICE_LOGS_DIR
     if not os.path.exists(f"{folder_path_1}/{folder_name}"):
         os.makedirs(f"{folder_path_1}/{folder_name}")
     if not os.path.exists(f"{folder_path_2}/{folder_name}"):

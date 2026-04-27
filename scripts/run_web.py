@@ -2,9 +2,26 @@
 """
 LAHSO Web Application - Production Runner
 """
-import os
 import sys
 from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+SRC_ROOT = PROJECT_ROOT / "src"
+
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+if str(SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(SRC_ROOT))
+
+from lahso.paths import (
+    Q_TABLES_DIR,
+    RAW_DATA_DIR,
+    SHIPMENT_LOGS_DIR,
+    SIMULATION_OUTPUTS_DIR,
+    TRAINING_METRICS_DIR,
+    WEB_TEMPLATES_DIR,
+    ensure_directories,
+)
 
 def check_requirements():
     """Check if all requirements are met"""
@@ -24,26 +41,26 @@ def check_requirements():
 
 def check_datasets():
     """Check if datasets are available"""
-    datasets_path = Path('Datasets')
+    datasets_path = RAW_DATA_DIR
     if not datasets_path.exists():
-        print("❌ Datasets directory not found")
-        print("Please copy your LAHSO datasets to the Datasets/ folder")
+        print("❌ Data directory not found")
+        print("Please copy your LAHSO datasets to the data/raw/ folders")
         return False
     
     required_files = [
-        'Network.csv',
-        'Network_Barge.csv', 
-        'Network_Train.csv',
-        'Network_Truck.csv',
-        'Fixed Vehicle Schedule.csv',
-        'Truck Schedule.csv',
-        'Mode Costs.csv'
+        datasets_path / "network" / "Network.csv",
+        datasets_path / "network" / "Network_Barge.csv",
+        datasets_path / "network" / "Network_Train.csv",
+        datasets_path / "network" / "Network_Truck.csv",
+        datasets_path / "schedules" / "Fixed Vehicle Schedule.csv",
+        datasets_path / "schedules" / "Truck Schedule.csv",
+        datasets_path / "costs" / "Mode Costs.csv",
     ]
     
     missing_files = []
     for file in required_files:
-        if not (datasets_path / file).exists():
-            missing_files.append(file)
+        if not file.exists():
+            missing_files.append(str(file.relative_to(datasets_path.parent)))
     
     if missing_files:
         print(f"⚠️  Missing dataset files: {missing_files}")
@@ -55,9 +72,13 @@ def check_datasets():
 
 def setup_directories():
     """Create required directories"""
-    directories = ['templates', 'q_table', 'training', 'csv_output', 'shipment_logs']
-    for directory in directories:
-        Path(directory).mkdir(exist_ok=True)
+    ensure_directories(
+        WEB_TEMPLATES_DIR,
+        Q_TABLES_DIR,
+        TRAINING_METRICS_DIR,
+        SIMULATION_OUTPUTS_DIR,
+        SHIPMENT_LOGS_DIR,
+    )
     print("✓ Required directories created")
 
 def start_application():

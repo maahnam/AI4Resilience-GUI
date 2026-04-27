@@ -66,6 +66,8 @@ minversion = "6.0"
 addopts = ["-ra", "--showlocals", "--strict-markers", "--strict-config"]
 xfail_strict = true
 filterwarnings = [
+  "ignore:datetime\\.datetime\\.utcfromtimestamp\\(\\) is deprecated.*:DeprecationWarning",
+  "ignore::DeprecationWarning:dateutil\\.tz\\.tz",
   "error",
 ]
 log_cli_level = "INFO"

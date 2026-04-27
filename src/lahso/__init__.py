@@ -5,12 +5,22 @@ LAHSO: LASHO
 from __future__ import annotations
 
 import json
+import os
 import sys
-from importlib.metadata import Distribution, version
+from importlib.metadata import Distribution, PackageNotFoundError, version
+
+from lahso.paths import DEFAULT_GUROBI_LICENSE_FILE
+
+
+if "GRB_LICENSE_FILE" not in os.environ and DEFAULT_GUROBI_LICENSE_FILE.exists():
+    os.environ["GRB_LICENSE_FILE"] = str(DEFAULT_GUROBI_LICENSE_FILE)
 
 
 def _is_editable() -> bool:
-    dist = Distribution.from_name("LAHSO")
+    try:
+        dist = Distribution.from_name("LAHSO")
+    except PackageNotFoundError:
+        return False
 
     if sys.version_info >= (3, 13):
         editable = dist.origin.dir_info.editable
@@ -38,9 +48,15 @@ if _is_editable():
         # This will fail with LookupError if Git is not installed
         __version__ = get_version(root="../..", relative_to=__file__)
     except (ImportError, LookupError, UserWarning):
-        __version__ = version(__name__)
+        try:
+            __version__ = version(__name__)
+        except PackageNotFoundError:
+            __version__ = "0+unknown"
 else:
     # Get the version as specified by the wheel
-    __version__ = version(__name__)
+    try:
+        __version__ = version(__name__)
+    except PackageNotFoundError:
+        __version__ = "0+unknown"
 
 __all__ = ("__version__",)

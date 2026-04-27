@@ -22,6 +22,16 @@ class ModelInput:
         return self.network_truck_ref.at[row["Origin"], row["Destination"]]
 
     def __init__(self, config):
+        def parse_solution_list(value):
+            if pd.isna(value):
+                return []
+
+            normalized = str(value).strip()
+            if normalized in {"", "0"}:
+                return []
+
+            return split_to_sublists(normalized)
+
         # Datasets input
         # Network dataset --> distance between terminals for each mode type
         network = pd.read_csv(config.network_path)
@@ -50,17 +60,17 @@ class ModelInput:
         if config.demand_type == "kbest":
             self.request = pd.read_csv(config.demand_kbest_path)
             self.request["Solution_List"] = self.request["Solution_List"].apply(
-                lambda s: [] if s == "0" else split_to_sublists(s)
+                parse_solution_list
             )
         elif config.demand_type == "planned":
             self.request = pd.read_csv(config.demand_planned_path)
             self.request["Solution_List"] = self.request["Solution_List"].apply(
-                lambda s: [] if s == "0" else split_to_sublists(s)
+                parse_solution_list
             )
         else:
             self.request = pd.read_csv(config.demand_default_path)
             self.request["Solution_List"] = self.request["Solution_List"].apply(
-                lambda s: [] if s == "0" else split_to_sublists(s)
+                parse_solution_list
             )
 
         self.request["Mode"] = self.request["Solution_List"].apply(

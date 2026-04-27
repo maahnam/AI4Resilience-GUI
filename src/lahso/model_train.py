@@ -312,6 +312,9 @@ def model_train(config, model_input):
 
                 # Export the episode total cost list
                 current_episode = last_episode + simulation
+                config.tc_path.parent.mkdir(parents=True, exist_ok=True)
+                config.tr_path.parent.mkdir(parents=True, exist_ok=True)
+                config.q_table_path.parent.mkdir(parents=True, exist_ok=True)
                 with open(config.tc_path, "wb") as f:
                     pickle.dump(total_cost_plot, f)
                     print(f"Total cost per episode is exported as {config.tc_name}")
@@ -327,9 +330,13 @@ def model_train(config, model_input):
                 ):
                     print_event(
                         config.print_event_enabled,
-                        f"Q-table is saved as q_table/{config.q_name}_eps.pkl",
+                        f"Q-table checkpoint is saved as {config.q_table_checkpoint_path(current_episode)}",
                     )
-                    with open(f"q_table/{config.q_name}_eps.pkl", "wb") as f:
+                    config.q_table_checkpoint_path(current_episode).parent.mkdir(
+                        parents=True,
+                        exist_ok=True,
+                    )
+                    with open(config.q_table_checkpoint_path(current_episode), "wb") as f:
                         pickle.dump(dict(model_input.Q), f)
             eps_end_time = time.time()  # To measure the runtime
             eps_time = eps_end_time - eps_start_time

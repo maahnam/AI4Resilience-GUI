@@ -12,6 +12,7 @@ import pandas as pd
 from lahso.config import Config
 from lahso.model_implementation import model_implementation
 from lahso.model_input import ModelInput
+from lahso.paths import Q_TABLES_DIR, RAW_DISRUPTIONS_DIR
 from lahso.ui.dataset_input_tab import (
     compute_with_dataset_input,
     dataset_input_next,
@@ -44,9 +45,7 @@ def model_implementation_tabs():
                         file_types=[".csv"],
                         height=100,
                         value=str(
-                            Path(
-                                "Datasets/Disruption_Profiles/No_Service_Disruption_Profile.csv"
-                            ).absolute()
+                            (RAW_DISRUPTIONS_DIR / "No_Service_Disruption_Profile.csv").absolute()
                         ),
                     )
                     demand_disruptions_input = gr.File(
@@ -54,13 +53,11 @@ def model_implementation_tabs():
                         file_types=[".csv"],
                         height=100,
                         value=str(
-                            Path(
-                                "Datasets/Disruption_Profiles/No_Request_Disruption_Profile.csv"
-                            ).absolute()
+                            (RAW_DISRUPTIONS_DIR / "No_Request_Disruption_Profile.csv").absolute()
                         ),
                     )
                     gr.Markdown("## Learning Agent Settings")
-                    p = Path("q_table/default_q_table_output.pkl")
+                    p = Q_TABLES_DIR / "default_q_table_output.pkl"
                     q_table_input = gr.File(
                         label="Q-Table",
                         file_types=[".pkl"],

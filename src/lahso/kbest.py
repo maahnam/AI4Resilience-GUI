@@ -121,6 +121,7 @@ def kbest(config, output_postfix=""):
 
     # Rename the aggregated column
     grouped = grouped.rename(columns={"Actual Announce Time": "Announce Time"})
+    config.demand_kbest_path.parent.mkdir(parents=True, exist_ok=True)
     grouped.to_csv(
         config.demand_kbest_path.with_stem(
             f"{config.demand_kbest_path.stem}{output_postfix}"

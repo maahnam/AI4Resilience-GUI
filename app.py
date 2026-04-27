@@ -3,15 +3,7 @@ LAHSO Flask Web Application
 Integrates the existing LAHSO Python code with the new HTML/JavaScript UI
 """
 import os
-
-# WICHTIG: Gurobi-Lizenz SOFORT setzen, bevor andere Module importiert werden
-os.environ['GRB_WLSACCESSID'] = '308c1129-cace-4d59-bc88-03aa440ca501'
-os.environ['GRB_WLSSECRET'] = 'ba7443c0-f3f7-4f47-a5d3-31bde73a9958'
-os.environ['GRB_WLSLICENSEID'] = '2678355'
-
-# Lizenzfile-Pfad setzen
-current_dir = os.path.dirname(os.path.abspath(__file__))
-os.environ['GRB_LICENSE_FILE'] = os.path.join(current_dir, 'gurobi.lic')
+import sys
 
 import json
 import asyncio
@@ -20,6 +12,12 @@ from threading import Thread
 import time
 import uuid
 from dotenv import load_dotenv
+
+PROJECT_ROOT = Path(__file__).resolve().parent
+SRC_ROOT = PROJECT_ROOT / "src"
+
+if str(SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(SRC_ROOT))
 
 # Load environment variables from .env file
 load_dotenv()
@@ -36,9 +34,21 @@ from lahso.model_implementation import model_implementation
 from lahso.kbest import kbest
 from lahso.service_to_path import service_to_path
 from lahso.bar_chart_plot import comparison
+from lahso.paths import (
+    DEFAULT_GUROBI_LICENSE_FILE,
+    project_relative,
+    Q_TABLES_DIR,
+    RAW_DISRUPTIONS_DIR,
+    TRAINING_METRICS_DIR,
+    WEB_TEMPLATES_DIR,
+    ensure_directories,
+)
+
+if "GRB_LICENSE_FILE" not in os.environ and DEFAULT_GUROBI_LICENSE_FILE.exists():
+    os.environ["GRB_LICENSE_FILE"] = str(DEFAULT_GUROBI_LICENSE_FILE)
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'lahso_secret_key_2024'
+app.config['SECRET_KEY'] = os.getenv("LAHSO_SECRET_KEY", "lahso_dev_secret_key")
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Global state management
@@ -84,7 +94,7 @@ def get_session():
 def index():
     """Serve the main HTML page"""
     # Read the HTML content
-    html_file = Path('templates/index.html')
+    html_file = WEB_TEMPLATES_DIR / "index.html"
     if html_file.exists():
         with open(html_file, 'r', encoding='utf-8') as f:
             html_content = f.read()
@@ -111,17 +121,17 @@ def get_default_config():
                 'impl_duration': 35
             },
             'default_files': {
-                'network': 'Datasets/Network.csv',
-                'network_barge': 'Datasets/Network_Barge.csv',
-                'network_train': 'Datasets/Network_Train.csv',
-                'network_truck': 'Datasets/Network_Truck.csv',
-                'fixed_schedule': 'Datasets/Fixed Vehicle Schedule.csv',
-                'truck_schedule': 'Datasets/Truck Schedule.csv',
-                'demand': 'Datasets/shipment_requests_200_3w_default.csv',
-                'mode_costs': 'Datasets/Mode Costs.csv',
-                'service_disruptions': 'Datasets/Disruption_Profiles/No_Service_Disruption_Profile.csv',
-                'demand_disruptions': 'Datasets/Disruption_Profiles/No_Request_Disruption_Profile.csv',
-                'q_table': 'q_table/default_q_table_output.pkl'
+                'network': project_relative(config.network_path),
+                'network_barge': project_relative(config.network_barge_path),
+                'network_train': project_relative(config.network_train_path),
+                'network_truck': project_relative(config.network_truck_path),
+                'fixed_schedule': project_relative(config.fixed_service_schedule_path),
+                'truck_schedule': project_relative(config.truck_schedule_path),
+                'demand': project_relative(config.demand_default_path),
+                'mode_costs': project_relative(config.mode_costs_path),
+                'service_disruptions': project_relative(config.s_disruption_path),
+                'demand_disruptions': project_relative(config.d_disruption_path),
+                'q_table': project_relative(config.q_table_path)
             }
         })
     except Exception as e:
@@ -137,23 +147,10 @@ def validate_dataset():
         # Create config with dataset parameters
         config = Config(
             print_event_enabled=False,
-            network_path=Path("Datasets/Network.csv"),
-            network_barge_path=Path("Datasets/Network_Barge.csv"),
-            network_train_path=Path("Datasets/Network_Train.csv"),
-            network_truck_path=Path("Datasets/Network_Truck.csv"),
-            fixed_service_schedule_path=Path("Datasets/Fixed Vehicle Schedule.csv"),
-            truck_schedule_path=Path("Datasets/Truck Schedule.csv"),
-            demand_default_path=Path("Datasets/shipment_requests_200_3w_default.csv"),
             demand_type="kbest" if data.get('compute_kbest', True) else "default",
-            mode_costs_path=Path("Datasets/Mode Costs.csv"),
             storage_cost=int(data.get('storage_cost', 1)),
             delay_penalty=int(data.get('delay_penalty', 1)),
             undelivered_penalty=int(data.get('undelivered_penalty', 100)),
-        )
-        
-        # Set k-best path
-        config.demand_kbest_path = config.demand_default_path.with_stem(
-            f"{config.demand_default_path.stem}_kbest"
         )
         
         # Run preprocessing
@@ -180,27 +177,18 @@ def configure_training():
         lahso_session = get_session()
         
         # Update training configuration
-        lahso_session.config.service_disruptions = Path(
-            "Datasets/Disruption_Profiles/No_Service_Disruption_Profile.csv"
-        )
-        lahso_session.config.demand_disruptions = Path(
-            "Datasets/Disruption_Profiles/No_Request_Disruption_Profile.csv"
-        )
+        default_config = Config()
+        lahso_session.config.s_disruption_path = default_config.s_disruption_path
+        lahso_session.config.d_disruption_path = default_config.d_disruption_path
         lahso_session.config.alpha = float(data.get('learning_rate', 0.5))
         lahso_session.config.epsilon = float(data.get('exploratory_rate', 0.95))
         lahso_session.config.number_of_simulation = int(data.get('num_simulations', 50000))
         lahso_session.config.simulation_duration = int(data.get('simulation_duration', 42)) * 1440  # Convert to minutes
         lahso_session.config.extract_q_table = 1
         lahso_session.config.start_from_0 = not data.get('continue_training', False)
-        
-        if data.get('continue_training', False):
-            lahso_session.config.q_table_path = Path("q_table/default_q_table_output.pkl")
-            lahso_session.config.tc_path = Path("training/default_total_cost_output.pkl")
-            lahso_session.config.tr_path = Path("training/default_total_reward_output.pkl")
-        else:
-            lahso_session.config.q_table_path = Path("q_table/default_q_table_output.pkl")
-            lahso_session.config.tc_path = Path("training/default_total_cost_output.pkl")
-            lahso_session.config.tr_path = Path("training/default_total_reward_output.pkl")
+        lahso_session.config.q_table_path = Q_TABLES_DIR / "default_q_table_output.pkl"
+        lahso_session.config.tc_path = TRAINING_METRICS_DIR / "default_total_cost_output.pkl"
+        lahso_session.config.tr_path = TRAINING_METRICS_DIR / "default_total_reward_output.pkl"
         
         lahso_session.total_episodes = lahso_session.config.number_of_simulation
         lahso_session.model_input = ModelInput(lahso_session.config)
@@ -303,12 +291,12 @@ def configure_implementation():
         
         # Create implementation config
         config = Config(
-            s_disruption_path=Path("Datasets/Disruption_Profiles/No_Service_Disruption_Profile.csv"),
-            d_disruption_path=Path("Datasets/Disruption_Profiles/No_Request_Disruption_Profile.csv"),
+            s_disruption_path=RAW_DISRUPTIONS_DIR / "No_Service_Disruption_Profile.csv",
+            d_disruption_path=RAW_DISRUPTIONS_DIR / "No_Request_Disruption_Profile.csv",
             number_of_simulation=int(data.get('num_simulations', 20)),
             simulation_duration=int(data.get('simulation_duration', 35)) * 1440,  # Convert to minutes
             start_from_0=True,
-            q_table_path=Path("q_table/default_q_table_output.pkl"),
+            q_table_path=Q_TABLES_DIR / "default_q_table_output.pkl",
             policy_name=data.get('policy', 'gp'),
             extract_shipment_output=True,
         )
@@ -492,11 +480,11 @@ def handle_join_session(data):
 
 if __name__ == '__main__':
     # Ensure required directories exist
-    os.makedirs('templates', exist_ok=True)
-    os.makedirs('q_table', exist_ok=True)
-    os.makedirs('training', exist_ok=True)
-    os.makedirs('csv_output', exist_ok=True)
-    os.makedirs('shipment_logs', exist_ok=True)
+    ensure_directories(
+        WEB_TEMPLATES_DIR,
+        Q_TABLES_DIR,
+        TRAINING_METRICS_DIR,
+    )
     
     print("🚀 LAHSO Web Application starting...")
     print("📡 Access the application at: http://localhost:5000")

@@ -1,8 +1,10 @@
 import matplotlib.pyplot as plt
 import pandas as pd
 
+from lahso.paths import SIMULATION_OUTPUTS_DIR
+
 cost = "Cost"
-path = "csv_output"
+path = SIMULATION_OUTPUTS_DIR
 simulations = 100
 
 
@@ -49,8 +51,8 @@ def comparison(file1, file2, label1, label2):
 
 def main():
     df_comparison = comparison(
-        f"{path}/aw_Def_{simulations}.csv",
-        f"{path}/gp_Def_{simulations}.csv",
+        str(path / f"aw_Def_{simulations}.csv"),
+        str(path / f"gp_Def_{simulations}.csv"),
         "blue",
         "orange",
     )
