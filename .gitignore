@@ -43,6 +43,11 @@ site/
 *.egg
 MANIFEST
 
+# SvelteKit frontend
+frontend/node_modules/
+frontend/.svelte-kit/
+frontend/build/
+
 # Local runtime config
 .env
 config/gurobi.lic

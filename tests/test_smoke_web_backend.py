@@ -17,6 +17,8 @@ def test_flask_backend_serves_index_and_default_config() -> None:
     assert b"LAHSO - Learning Assisted Hybrid Simulation-Optimization" in (
         index_response.data
     )
+    assert b"SvelteKit app under" in index_response.data
+    assert b"bun --bun run dev" in index_response.data
 
     config_response = client.get("/api/config/default")
     assert config_response.status_code == 200

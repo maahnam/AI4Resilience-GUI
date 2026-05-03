@@ -13,6 +13,7 @@ app = create_app()
 
 if __name__ == "__main__":
     print("🚀 LAHSO Web Application starting...")
-    print("📡 Access the application at: http://localhost:5000")
+    print("📡 Access the Flask API at: http://localhost:5001")
+    print("🖥️  Start the SvelteKit UI from frontend/ with: bun --bun run dev")
 
-    socketio.run(app, host="0.0.0.0", port=5000, debug=True)
+    socketio.run(app, host="0.0.0.0", port=5001, debug=True)
