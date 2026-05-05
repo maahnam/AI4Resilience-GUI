@@ -20,13 +20,48 @@ def test_sveltekit_frontend_uses_svelte_5_and_flask_api_contract() -> None:
 
     page_source = (FRONTEND_ROOT / "src" / "routes" / "+page.svelte").read_text()
     api_source = (FRONTEND_ROOT / "src" / "lib" / "api.ts").read_text()
+    series_chart_source = (
+        FRONTEND_ROOT / "src" / "lib" / "components" / "SeriesChart.svelte"
+    ).read_text()
+    app_css = (FRONTEND_ROOT / "src" / "app.css").read_text()
     svelte_config = (FRONTEND_ROOT / "svelte.config.js").read_text()
     vite_config = (FRONTEND_ROOT / "vite.config.ts").read_text()
 
     assert "$state(" in page_source
     assert "$derived(" in page_source
+    assert "DragDropFileInput" in page_source
+    assert "bind:file={datasetForm.network}" in page_source
+    assert "id=\"implementation-dataset-network\"" in page_source
+    assert "onsubmit={submitImplementationDataset}" in page_source
+    assert "bind:file={trainingForm.service_disruptions}" in page_source
+    assert "bind:file={implementationForm.q_table}" in page_source
+    assert "bind:file={comparisonForm.file1}" in page_source
+    assert "bind:file={comparisonForm.file2}" in page_source
+    assert page_source.count('xAxisLabel="Episode"') == 3
+    assert 'yAxisLabel="Total Cost"' in page_source
+    assert 'yAxisLabel="Total Reward"' in page_source
+    assert "axisXTicks" in series_chart_source
+    assert "axisYTicks" in series_chart_source
+    assert 'class="x-axis-scale"' in series_chart_source
+    assert 'class="y-axis-scale"' in series_chart_source
+    assert ".x-axis-scale" in app_css
+    assert ".y-axis-scale" in app_css
+    assert 'tone="blue"\n\t\t\t\t\t\t\t\temptyLabel' not in page_source
+    assert 'tone="amber"\n\t\t\t\t\t\t\t\temptyLabel' not in page_source
+    assert "const canControlTraining = $derived(trainingReady || trainingRunning)" in page_source
+    assert "payload.error === 'Training already active'" in page_source
+    assert "Controls are reconnected" in page_source
+    assert "disabled={!canControlTraining || trainingPaused}" in page_source
+    assert page_source.count("disabled={!canControlTraining}") == 2
     assert "on:click" not in page_source
     assert "on:submit" not in page_source
+    assert "syncSession(payload.session_id)" in page_source
+    assert "join_session" in page_source
+    assert "CSV Path" not in page_source
+    assert "FormData" in api_source
+    assert "appendOptionalFile(formData, 'network'" in api_source
+    assert "appendOptionalFile(formData, 'service_disruptions'" in api_source
+    assert "appendOptionalFile(formData, 'q_table'" in api_source
     assert "/api/config/default" in api_source
     assert "/api/training/start" in api_source
     assert "svelte-adapter-bun" in svelte_config

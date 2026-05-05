@@ -6,7 +6,6 @@
 		BarChart3,
 		BrainCircuit,
 		CheckCircle2,
-		Database,
 		Pause,
 		Play,
 		RefreshCw,
@@ -15,7 +14,7 @@
 		Square
 	} from 'lucide-svelte';
 	import { api, apiBase } from '$lib/api';
-	import FileBadge from '$lib/components/FileBadge.svelte';
+	import DragDropFileInput from '$lib/components/DragDropFileInput.svelte';
 	import MetricCard from '$lib/components/MetricCard.svelte';
 	import SeriesChart from '$lib/components/SeriesChart.svelte';
 	import type {
@@ -91,6 +90,14 @@
 	let feedbackTone: FeedbackTone = $state('neutral');
 
 	let datasetForm: DatasetForm = $state({
+		network: null,
+		network_barge: null,
+		network_train: null,
+		network_truck: null,
+		fixed_schedule: null,
+		truck_schedule: null,
+		demand: null,
+		mode_costs: null,
 		storage_cost: 1,
 		delay_penalty: 1,
 		undelivered_penalty: 100,
@@ -98,6 +105,11 @@
 	});
 
 	let trainingForm: TrainingForm = $state({
+		service_disruptions: null,
+		demand_disruptions: null,
+		last_q_table: null,
+		last_total_cost: null,
+		last_reward: null,
 		learning_rate: 0.5,
 		exploratory_rate: 0.95,
 		num_simulations: 50000,
@@ -106,14 +118,17 @@
 	});
 
 	let implementationForm: ImplementationForm = $state({
+		service_disruptions: null,
+		demand_disruptions: null,
+		q_table: null,
 		policy: 'gp',
 		num_simulations: 20,
 		simulation_duration: 35
 	});
 
 	let comparisonForm: ComparisonForm = $state({
-		file1_path: '',
-		file2_path: '',
+		file1: null,
+		file2: null,
 		label1: 'Always Wait',
 		label2: 'Greedy Policy'
 	});
@@ -126,8 +141,7 @@
 		totalEpisodes > 0 ? Math.min(100, Math.round((trainingEpisode / totalEpisodes) * 100)) : 0
 	);
 	const comparisonPreviewRows = $derived(comparisonRows.slice(0, 10));
-	const datasetFiles = $derived(datasetFileList(defaultFiles));
-	const disruptionFiles = $derived(disruptionFileList(defaultFiles));
+	const canControlTraining = $derived(trainingReady || trainingRunning);
 
 	onMount(() => {
 		let disposed = false;
@@ -145,8 +159,8 @@
 			socket = client;
 
 			client.on('connected', (payload: { session_id: string }) => {
-				sessionId = payload.session_id;
 				socketConnected = true;
+				syncSession(sessionId || payload.session_id);
 			});
 			client.on('disconnect', () => {
 				socketConnected = false;
@@ -219,6 +233,24 @@
 		}
 	}
 
+	async function submitImplementationDataset(event: SubmitEvent) {
+		event.preventDefault();
+		setFeedback('Validating implementation dataset and path inputs...', 'neutral');
+		try {
+			const payload = await api.validateDataset(normalizeDatasetForm());
+			if (!payload.success) {
+				setFeedback(payload.error ?? 'Implementation dataset validation failed.', 'error');
+				return;
+			}
+			datasetReady = true;
+			implementationDatasetReady = true;
+			implementationStep = 'settings';
+			setFeedback(payload.message ?? 'Implementation dataset validated.', 'good');
+		} catch (error) {
+			setFeedback(errorMessage(error, 'Implementation dataset validation failed.'), 'error');
+		}
+	}
+
 	async function submitTrainingSettings(event: SubmitEvent) {
 		event.preventDefault();
 		setFeedback('Saving training configuration...', 'neutral');
@@ -234,6 +266,7 @@
 			trainingEpisode = 0;
 			trainingMetrics = [];
 			setFeedback(payload.message ?? 'Training configuration saved.', 'good');
+			await startTraining();
 		} catch (error) {
 			setFeedback(errorMessage(error, 'Training configuration failed.'), 'error');
 		}
@@ -246,9 +279,18 @@
 		try {
 			const payload = await api.startTraining();
 			if (!payload.success) {
+				if (payload.error === 'Training already active') {
+					syncSession(payload.session_id);
+					trainingReady = true;
+					trainingRunning = true;
+					trainingPaused = false;
+					setFeedback('Training is already active. Controls are reconnected.', 'warn');
+					return;
+				}
 				setFeedback(payload.error ?? 'Training did not start.', 'error');
 				return;
 			}
+			syncSession(payload.session_id);
 			trainingRunning = true;
 			trainingPaused = false;
 			setFeedback(payload.message ?? 'Training started.', 'good');
@@ -258,20 +300,24 @@
 	}
 
 	async function pauseTraining() {
-		if (!trainingRunning || trainingPaused) return;
+		if (!canControlTraining || trainingPaused) return;
 
 		const payload = await api.pauseTraining();
 		if (payload.success) {
+			trainingRunning = true;
 			trainingPaused = true;
 			setFeedback(payload.message ?? 'Training paused.', 'warn');
+		} else {
+			setFeedback(payload.error ?? 'Training could not pause.', 'error');
 		}
 	}
 
 	async function resumeTraining() {
-		if (!trainingRunning || !trainingPaused) return;
+		if (!canControlTraining) return;
 
 		const payload = await api.resumeTraining();
 		if (payload.success) {
+			trainingRunning = true;
 			trainingPaused = false;
 			setFeedback(payload.message ?? 'Training resumed.', 'good');
 		} else {
@@ -280,18 +326,16 @@
 	}
 
 	async function stopTraining() {
+		if (!canControlTraining) return;
+
 		const payload = await api.stopTraining();
 		if (payload.success) {
 			trainingRunning = false;
 			trainingPaused = false;
 			setFeedback(payload.message ?? 'Training stopped.', 'warn');
+		} else {
+			setFeedback(payload.error ?? 'Training could not stop.', 'error');
 		}
-	}
-
-	function acceptImplementationDataset() {
-		implementationDatasetReady = true;
-		implementationStep = 'settings';
-		setFeedback('Implementation will reuse the current dataset configuration.', 'good');
 	}
 
 	async function submitImplementationSettings(event: SubmitEvent) {
@@ -322,6 +366,7 @@
 				setFeedback(payload.error ?? 'Simulation did not start.', 'error');
 				return;
 			}
+			syncSession(payload.session_id);
 			simulationRunning = true;
 			setFeedback(payload.message ?? 'Simulation started.', 'good');
 		} catch (error) {
@@ -331,12 +376,18 @@
 
 	async function submitComparison(event: SubmitEvent) {
 		event.preventDefault();
+
+		if (!comparisonForm.file1 || !comparisonForm.file2) {
+			setFeedback('Choose two policy output CSV files before comparing.', 'warn');
+			return;
+		}
+
 		setFeedback('Comparing output files...', 'neutral');
 		try {
 			const payload = await api.compareResults({
 				...comparisonForm,
-				file1_path: comparisonForm.file1_path.trim(),
-				file2_path: comparisonForm.file2_path.trim(),
+				file1: comparisonForm.file1,
+				file2: comparisonForm.file2,
 				label1: comparisonForm.label1.trim() || 'Policy 1',
 				label2: comparisonForm.label2.trim() || 'Policy 2'
 			});
@@ -367,8 +418,23 @@
 		simulationMetrics = payload.data;
 	}
 
+	function syncSession(nextSessionId?: string) {
+		if (!nextSessionId) return;
+
+		sessionId = nextSessionId;
+		socket?.emit('join_session', { session_id: nextSessionId });
+	}
+
 	function normalizeDatasetForm(): DatasetForm {
 		return {
+			network: datasetForm.network,
+			network_barge: datasetForm.network_barge,
+			network_train: datasetForm.network_train,
+			network_truck: datasetForm.network_truck,
+			fixed_schedule: datasetForm.fixed_schedule,
+			truck_schedule: datasetForm.truck_schedule,
+			demand: datasetForm.demand,
+			mode_costs: datasetForm.mode_costs,
 			storage_cost: Number(datasetForm.storage_cost),
 			delay_penalty: Number(datasetForm.delay_penalty),
 			undelivered_penalty: Number(datasetForm.undelivered_penalty),
@@ -378,6 +444,11 @@
 
 	function normalizeTrainingForm(): TrainingForm {
 		return {
+			service_disruptions: trainingForm.service_disruptions,
+			demand_disruptions: trainingForm.demand_disruptions,
+			last_q_table: trainingForm.last_q_table,
+			last_total_cost: trainingForm.last_total_cost,
+			last_reward: trainingForm.last_reward,
 			learning_rate: Number(trainingForm.learning_rate),
 			exploratory_rate: Number(trainingForm.exploratory_rate),
 			num_simulations: Number(trainingForm.num_simulations),
@@ -388,6 +459,9 @@
 
 	function normalizeImplementationForm(): ImplementationForm {
 		return {
+			service_disruptions: implementationForm.service_disruptions,
+			demand_disruptions: implementationForm.demand_disruptions,
+			q_table: implementationForm.q_table,
 			policy: implementationForm.policy,
 			num_simulations: Number(implementationForm.num_simulations),
 			simulation_duration: Number(implementationForm.simulation_duration)
@@ -415,30 +489,6 @@
 		return error instanceof Error ? error.message : fallback;
 	}
 
-	function datasetFileList(files: DefaultFiles | null): Array<[string, string]> {
-		if (!files) return [];
-
-		return [
-			['Intermodal network', files.network],
-			['Barge network', files.network_barge],
-			['Train network', files.network_train],
-			['Truck network', files.network_truck],
-			['Fixed schedule', files.fixed_schedule],
-			['Truck schedule', files.truck_schedule],
-			['Demand', files.demand],
-			['Mode costs', files.mode_costs]
-		];
-	}
-
-	function disruptionFileList(files: DefaultFiles | null): Array<[string, string]> {
-		if (!files) return [];
-
-		return [
-			['Service disruptions', files.service_disruptions],
-			['Demand disruptions', files.demand_disruptions],
-			['Q-table', files.q_table]
-		];
-	}
 </script>
 
 <svelte:head>
@@ -531,14 +581,58 @@
 						<form class="panel-grid" onsubmit={submitDataset}>
 							<div class="field-panel">
 								<h2>Network and Demand Files</h2>
-								<div class="field-grid">
-									{#each datasetFiles as file (file[0])}
-										<FileBadge label={file[0]} path={file[1]} />
-									{/each}
-								</div>
+								<DragDropFileInput
+									id="dataset-network"
+									label="Intermodal Network"
+									helper={defaultFiles ? `Default: ${defaultFiles.network}` : 'CSV input'}
+									bind:file={datasetForm.network}
+								/>
+								<DragDropFileInput
+									id="dataset-network-barge"
+									label="Barge Network"
+									helper={defaultFiles ? `Default: ${defaultFiles.network_barge}` : 'CSV input'}
+									bind:file={datasetForm.network_barge}
+								/>
+								<DragDropFileInput
+									id="dataset-network-train"
+									label="Train Network"
+									helper={defaultFiles ? `Default: ${defaultFiles.network_train}` : 'CSV input'}
+									bind:file={datasetForm.network_train}
+								/>
+								<DragDropFileInput
+									id="dataset-network-truck"
+									label="Truck Network"
+									helper={defaultFiles ? `Default: ${defaultFiles.network_truck}` : 'CSV input'}
+									bind:file={datasetForm.network_truck}
+								/>
 							</div>
 
 							<div class="field-panel">
+								<h2>Schedules, Demand, and Costs</h2>
+								<DragDropFileInput
+									id="dataset-fixed-schedule"
+									label="Fixed Schedule"
+									helper={defaultFiles ? `Default: ${defaultFiles.fixed_schedule}` : 'CSV input'}
+									bind:file={datasetForm.fixed_schedule}
+								/>
+								<DragDropFileInput
+									id="dataset-truck-schedule"
+									label="Truck Schedule"
+									helper={defaultFiles ? `Default: ${defaultFiles.truck_schedule}` : 'CSV input'}
+									bind:file={datasetForm.truck_schedule}
+								/>
+								<DragDropFileInput
+									id="dataset-demand"
+									label="Demand"
+									helper={defaultFiles ? `Default: ${defaultFiles.demand}` : 'CSV input'}
+									bind:file={datasetForm.demand}
+								/>
+								<DragDropFileInput
+									id="dataset-mode-costs"
+									label="Mode Costs"
+									helper={defaultFiles ? `Default: ${defaultFiles.mode_costs}` : 'CSV input'}
+									bind:file={datasetForm.mode_costs}
+								/>
 								<h2>Cost Parameters</h2>
 								<label class="form-field">
 									<span>Storage Cost</span>
@@ -575,11 +669,41 @@
 						<form class="panel-grid" onsubmit={submitTrainingSettings}>
 							<div class="field-panel">
 								<h2>Disruption Inputs</h2>
-								<div class="field-grid">
-									{#each disruptionFiles.slice(0, 2) as file (file[0])}
-										<FileBadge label={file[0]} path={file[1]} />
-									{/each}
-								</div>
+								<DragDropFileInput
+									id="training-service-disruptions"
+									label="Service Disruptions"
+									helper={defaultFiles ? `Default: ${defaultFiles.service_disruptions}` : 'CSV input'}
+									bind:file={trainingForm.service_disruptions}
+								/>
+								<DragDropFileInput
+									id="training-demand-disruptions"
+									label="Demand Disruptions"
+									helper={defaultFiles ? `Default: ${defaultFiles.demand_disruptions}` : 'CSV input'}
+									bind:file={trainingForm.demand_disruptions}
+								/>
+								{#if trainingForm.continue_training}
+									<DragDropFileInput
+										id="training-last-q-table"
+										label="Last Q-Table"
+										accept=".pkl"
+										helper={defaultFiles ? `Default: ${defaultFiles.q_table}` : 'PKL input'}
+										bind:file={trainingForm.last_q_table}
+									/>
+									<DragDropFileInput
+										id="training-last-total-cost"
+										label="Last Total Cost"
+										accept=".pkl"
+										helper="Previous total-cost metric pickle"
+										bind:file={trainingForm.last_total_cost}
+									/>
+									<DragDropFileInput
+										id="training-last-reward"
+										label="Last Reward"
+										accept=".pkl"
+										helper="Previous reward metric pickle"
+										bind:file={trainingForm.last_reward}
+									/>
+								{/if}
 							</div>
 
 							<div class="field-panel">
@@ -651,7 +775,7 @@
 									class="icon-button"
 									type="button"
 									aria-label="Pause training"
-									disabled={!trainingRunning || trainingPaused}
+									disabled={!canControlTraining || trainingPaused}
 									onclick={pauseTraining}
 								>
 									<Pause size={18} />
@@ -660,7 +784,7 @@
 									class="icon-button"
 									type="button"
 									aria-label="Resume training"
-									disabled={!trainingRunning || !trainingPaused}
+									disabled={!canControlTraining}
 									onclick={resumeTraining}
 								>
 									<Play size={18} />
@@ -669,7 +793,7 @@
 									class="icon-button"
 									type="button"
 									aria-label="Stop training"
-									disabled={!trainingRunning}
+									disabled={!canControlTraining}
 									onclick={stopTraining}
 								>
 									<Square size={17} />
@@ -677,8 +801,22 @@
 							</div>
 
 							<div class="chart-grid">
-								<SeriesChart title="Average Total Cost" points={trainingCostSeries} tone="amber" />
-								<SeriesChart title="Average Reward" points={trainingRewardSeries} tone="green" />
+								<SeriesChart
+									title="Average Total Cost"
+									points={trainingCostSeries}
+									tone="green"
+									xAxisLabel="Episode"
+									yAxisLabel="Total Cost"
+									emptyLabel={trainingRunning ? 'Training is running' : 'Waiting for data'}
+								/>
+								<SeriesChart
+									title="Average Reward"
+									points={trainingRewardSeries}
+									tone="green"
+									xAxisLabel="Episode"
+									yAxisLabel="Total Reward"
+									emptyLabel={trainingRunning ? 'Training is running' : 'Waiting for data'}
+								/>
 							</div>
 						</div>
 					{/if}
@@ -710,26 +848,117 @@
 					</div>
 
 					{#if implementationStep === 'dataset'}
-						<div class="run-panel">
-							<h2>Reuse Dataset Configuration</h2>
-							<p>
-								The implementation run uses the dataset selected in the training workflow and the
-								default q-table artifact unless a backend upload path is added later.
-							</p>
-							<div class="panel-grid">
-								{#each disruptionFiles as file (file[0])}
-									<FileBadge label={file[0]} path={file[1]} />
-								{/each}
+						<form class="panel-grid" onsubmit={submitImplementationDataset}>
+							<div class="field-panel">
+								<h2>Network and Demand Files</h2>
+								<DragDropFileInput
+									id="implementation-dataset-network"
+									label="Intermodal Network"
+									helper={defaultFiles ? `Default: ${defaultFiles.network}` : 'CSV input'}
+									bind:file={datasetForm.network}
+								/>
+								<DragDropFileInput
+									id="implementation-dataset-network-barge"
+									label="Barge Network"
+									helper={defaultFiles ? `Default: ${defaultFiles.network_barge}` : 'CSV input'}
+									bind:file={datasetForm.network_barge}
+								/>
+								<DragDropFileInput
+									id="implementation-dataset-network-train"
+									label="Train Network"
+									helper={defaultFiles ? `Default: ${defaultFiles.network_train}` : 'CSV input'}
+									bind:file={datasetForm.network_train}
+								/>
+								<DragDropFileInput
+									id="implementation-dataset-network-truck"
+									label="Truck Network"
+									helper={defaultFiles ? `Default: ${defaultFiles.network_truck}` : 'CSV input'}
+									bind:file={datasetForm.network_truck}
+								/>
 							</div>
-							<div class="action-row">
-								<button class="primary-button" type="button" onclick={acceptImplementationDataset}>
-									<Database size={18} />
-									Use Current Dataset
-								</button>
+
+							<div class="field-panel">
+								<h2>Schedules, Demand, and Costs</h2>
+								<DragDropFileInput
+									id="implementation-dataset-fixed-schedule"
+									label="Fixed Schedule"
+									helper={defaultFiles ? `Default: ${defaultFiles.fixed_schedule}` : 'CSV input'}
+									bind:file={datasetForm.fixed_schedule}
+								/>
+								<DragDropFileInput
+									id="implementation-dataset-truck-schedule"
+									label="Truck Schedule"
+									helper={defaultFiles ? `Default: ${defaultFiles.truck_schedule}` : 'CSV input'}
+									bind:file={datasetForm.truck_schedule}
+								/>
+								<DragDropFileInput
+									id="implementation-dataset-demand"
+									label="Demand"
+									helper={defaultFiles ? `Default: ${defaultFiles.demand}` : 'CSV input'}
+									bind:file={datasetForm.demand}
+								/>
+								<DragDropFileInput
+									id="implementation-dataset-mode-costs"
+									label="Mode Costs"
+									helper={defaultFiles ? `Default: ${defaultFiles.mode_costs}` : 'CSV input'}
+									bind:file={datasetForm.mode_costs}
+								/>
+								<h2>Cost Parameters</h2>
+								<label class="form-field">
+									<span>Storage Cost</span>
+									<input type="number" min="0" bind:value={datasetForm.storage_cost} />
+									<span class="hint">Euro per container hour</span>
+								</label>
+								<label class="form-field">
+									<span>Delay Penalty</span>
+									<input type="number" min="0" bind:value={datasetForm.delay_penalty} />
+									<span class="hint">Euro per container hour</span>
+								</label>
+								<label class="form-field">
+									<span>Undelivered Penalty</span>
+									<input type="number" min="0" bind:value={datasetForm.undelivered_penalty} />
+									<span class="hint">Euro per container</span>
+								</label>
+								<label class="check-row">
+									<input type="checkbox" bind:checked={datasetForm.compute_kbest} />
+									<span>Compute K-best solution set</span>
+								</label>
+								<div class="action-row">
+									<button class="primary-button" type="submit" disabled={loadingConfig}>
+										<CheckCircle2 size={18} />
+										Validate Dataset
+									</button>
+									<button class="ghost-button" type="button" onclick={loadDefaults}>
+										<RefreshCw size={17} />
+										Reload Defaults
+									</button>
+								</div>
 							</div>
-						</div>
+						</form>
 					{:else if implementationStep === 'settings'}
 						<form class="panel-grid" onsubmit={submitImplementationSettings}>
+							<div class="field-panel">
+								<h2>Disruption and Model Inputs</h2>
+								<DragDropFileInput
+									id="implementation-service-disruptions"
+									label="Service Disruptions"
+									helper="Default: data/raw/disruptions/No_Service_Disruption_Profile.csv"
+									bind:file={implementationForm.service_disruptions}
+								/>
+								<DragDropFileInput
+									id="implementation-demand-disruptions"
+									label="Demand Disruptions"
+									helper="Default: data/raw/disruptions/No_Request_Disruption_Profile.csv"
+									bind:file={implementationForm.demand_disruptions}
+								/>
+								<DragDropFileInput
+									id="implementation-q-table"
+									label="Q-Table"
+									accept=".pkl"
+									helper={defaultFiles ? `Default: ${defaultFiles.q_table}` : 'PKL input'}
+									bind:file={implementationForm.q_table}
+								/>
+							</div>
 							<div class="field-panel">
 								<h2>Policy</h2>
 								<div class="segment-control" aria-label="Policy">
@@ -755,8 +984,6 @@
 										Always Reassign
 									</button>
 								</div>
-							</div>
-							<div class="field-panel">
 								<h2>Simulation</h2>
 								<label class="form-field">
 									<span>Number of Simulations</span>
@@ -804,7 +1031,10 @@
 							<SeriesChart
 								title="Total Cost per Simulation Episode"
 								points={simulationCostSeries}
-								tone="blue"
+								tone="green"
+								xAxisLabel="Episode"
+								yAxisLabel="Total Cost"
+								emptyLabel={simulationRunning ? 'Simulation is running' : 'Waiting for data'}
 							/>
 						</div>
 					{/if}
@@ -831,14 +1061,12 @@
 						<form class="panel-grid" onsubmit={submitComparison}>
 							<div class="field-panel">
 								<h2>First Policy Output</h2>
-								<label class="form-field">
-									<span>CSV Path</span>
-									<input
-										type="text"
-										placeholder="artifacts/runs/simulation_outputs/always_wait.csv"
-										bind:value={comparisonForm.file1_path}
-									/>
-								</label>
+								<DragDropFileInput
+									id="comparison-file-1"
+									label="Policy CSV"
+									helper="Upload the first simulation output file"
+									bind:file={comparisonForm.file1}
+								/>
 								<label class="form-field">
 									<span>Plot Label</span>
 									<input type="text" bind:value={comparisonForm.label1} />
@@ -846,14 +1074,12 @@
 							</div>
 							<div class="field-panel">
 								<h2>Second Policy Output</h2>
-								<label class="form-field">
-									<span>CSV Path</span>
-									<input
-										type="text"
-										placeholder="artifacts/runs/simulation_outputs/greedy_policy.csv"
-										bind:value={comparisonForm.file2_path}
-									/>
-								</label>
+								<DragDropFileInput
+									id="comparison-file-2"
+									label="Policy CSV"
+									helper="Upload the second simulation output file"
+									bind:file={comparisonForm.file2}
+								/>
 								<label class="form-field">
 									<span>Plot Label</span>
 									<input type="text" bind:value={comparisonForm.label2} />

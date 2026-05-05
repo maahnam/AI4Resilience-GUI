@@ -41,6 +41,14 @@ export type DefaultConfigPayload = ApiResponse<{
 }>;
 
 export type DatasetForm = {
+	network: File | null;
+	network_barge: File | null;
+	network_train: File | null;
+	network_truck: File | null;
+	fixed_schedule: File | null;
+	truck_schedule: File | null;
+	demand: File | null;
+	mode_costs: File | null;
 	storage_cost: number;
 	delay_penalty: number;
 	undelivered_penalty: number;
@@ -48,6 +56,11 @@ export type DatasetForm = {
 };
 
 export type TrainingForm = {
+	service_disruptions: File | null;
+	demand_disruptions: File | null;
+	last_q_table: File | null;
+	last_total_cost: File | null;
+	last_reward: File | null;
 	learning_rate: number;
 	exploratory_rate: number;
 	num_simulations: number;
@@ -56,14 +69,17 @@ export type TrainingForm = {
 };
 
 export type ImplementationForm = {
+	service_disruptions: File | null;
+	demand_disruptions: File | null;
+	q_table: File | null;
 	policy: 'gp' | 'aw' | 'ar';
 	num_simulations: number;
 	simulation_duration: number;
 };
 
 export type ComparisonForm = {
-	file1_path: string;
-	file2_path: string;
+	file1: File | null;
+	file2: File | null;
 	label1: string;
 	label2: string;
 };

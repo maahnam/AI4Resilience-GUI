@@ -10,6 +10,7 @@ from jinja2 import TemplateNotFound
 from lahso.web.jobs import BackgroundJobRunner
 from lahso.web.services import (
     compare_result_files,
+    compare_result_uploads,
     configure_implementation,
     configure_training,
     get_default_config_payload,
@@ -42,7 +43,9 @@ def register_routes(
     def validate_dataset_route():
         try:
             lahso_session = session_store.get_for_current_request()
-            return jsonify(validate_dataset(_json_payload(), lahso_session))
+            return jsonify(
+                validate_dataset(_request_payload(), lahso_session, request.files)
+            )
         except Exception as exc:
             return _json_error(exc)
 
@@ -50,7 +53,13 @@ def register_routes(
     def configure_training_route():
         try:
             lahso_session = session_store.get_for_current_request()
-            return jsonify(configure_training(_json_payload(), lahso_session))
+            print(
+                f"Configuring training for session {lahso_session.session_id}",
+                flush=True,
+            )
+            return jsonify(
+                configure_training(_request_payload(), lahso_session, request.files)
+            )
         except Exception as exc:
             return _json_error(exc)
 
@@ -60,12 +69,22 @@ def register_routes(
             lahso_session = session_store.get_for_current_request()
 
             if lahso_session.training_active:
-                return jsonify({"success": False, "error": "Training already active"})
+                return jsonify(
+                    {
+                        "success": False,
+                        "error": "Training already active",
+                        "session_id": lahso_session.session_id,
+                    }
+                )
 
             lahso_session.training_active = True
             lahso_session.training_paused = False
             lahso_session.current_episode = 0
 
+            print(
+                f"Starting training background job for session {lahso_session.session_id}",
+                flush=True,
+            )
             job_runner.start_training(session_store, socketio, lahso_session.session_id)
 
             return jsonify(
@@ -82,6 +101,11 @@ def register_routes(
     def pause_training():
         try:
             lahso_session = session_store.get_for_current_request()
+            if not lahso_session.training_active:
+                return jsonify(
+                    {"success": False, "error": "No training session active"}
+                )
+
             lahso_session.training_paused = True
 
             return jsonify({"success": True, "message": "Training paused"})
@@ -119,7 +143,13 @@ def register_routes(
     def configure_implementation_route():
         try:
             lahso_session = session_store.get_for_current_request()
-            return jsonify(configure_implementation(_json_payload(), lahso_session))
+            return jsonify(
+                configure_implementation(
+                    _request_payload(),
+                    lahso_session,
+                    request.files,
+                )
+            )
         except Exception as exc:
             return _json_error(exc)
 
@@ -133,6 +163,10 @@ def register_routes(
 
             lahso_session.simulation_active = True
 
+            print(
+                f"Starting implementation background job for session {lahso_session.session_id}",
+                flush=True,
+            )
             job_runner.start_simulation(
                 session_store,
                 socketio,
@@ -152,9 +186,15 @@ def register_routes(
     @app.route("/api/comparison/compare", methods=["POST"])
     def compare_results():
         try:
+            if request.files or request.form:
+                return jsonify(compare_result_uploads(request.form, request.files))
             return jsonify(compare_result_files(_json_payload()))
         except Exception as exc:
             return _json_error(exc)
+
+
+def _request_payload() -> Mapping[str, Any]:
+    return request.form if request.form else _json_payload()
 
 
 def _json_payload() -> Mapping[str, Any]:

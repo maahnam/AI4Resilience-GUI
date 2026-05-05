@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import time
-from threading import Thread
+from typing import Any
 
 from flask_socketio import SocketIO
 
 from lahso.model_implementation import model_implementation
 from lahso.model_train import model_train
+from lahso.web.serialization import dataframe_records, json_safe
 from lahso.web.state import SessionStore
 
 
@@ -18,28 +18,26 @@ class BackgroundJobRunner:
         session_store: SessionStore,
         socketio: SocketIO,
         session_id: str,
-    ) -> Thread:
-        training_thread = Thread(
-            target=self.run_training,
-            args=(session_store, socketio, session_id),
-            daemon=True,
+    ) -> Any:
+        return socketio.start_background_task(
+            self.run_training,
+            session_store,
+            socketio,
+            session_id,
         )
-        training_thread.start()
-        return training_thread
 
     def start_simulation(
         self,
         session_store: SessionStore,
         socketio: SocketIO,
         session_id: str,
-    ) -> Thread:
-        simulation_thread = Thread(
-            target=self.run_simulation,
-            args=(session_store, socketio, session_id),
-            daemon=True,
+    ) -> Any:
+        return socketio.start_background_task(
+            self.run_simulation,
+            session_store,
+            socketio,
+            session_id,
         )
-        simulation_thread.start()
-        return simulation_thread
 
     def run_training(
         self,
@@ -52,6 +50,18 @@ class BackgroundJobRunner:
             return
 
         try:
+            print(f"Training worker started for session {session_id}", flush=True)
+            socketio.emit(
+                "training_progress",
+                {
+                    "session_id": session_id,
+                    "episode": lahso_session.current_episode,
+                    "total_episodes": lahso_session.total_episodes,
+                    "data": [],
+                },
+                room=session_id,
+            )
+            socketio.sleep(0)
             training_gen = model_train(lahso_session.config, lahso_session.model_input)
 
             for result in training_gen:
@@ -59,32 +69,37 @@ class BackgroundJobRunner:
                     break
 
                 while lahso_session.training_paused:
-                    time.sleep(1)
+                    socketio.sleep(1)
                     if not lahso_session.training_active:
                         break
 
                 if result is not None:
                     if "Episode" in result.columns:
-                        lahso_session.current_episode = result["Episode"].max()
+                        lahso_session.current_episode = json_safe(
+                            result["Episode"].max()
+                        )
 
+                    print(
+                        "Training worker emitting episode "
+                        f"{lahso_session.current_episode}/"
+                        f"{lahso_session.total_episodes} for session {session_id}",
+                        flush=True,
+                    )
                     socketio.emit(
                         "training_progress",
                         {
                             "session_id": session_id,
                             "episode": lahso_session.current_episode,
                             "total_episodes": lahso_session.total_episodes,
-                            "data": (
-                                result.to_dict("records")
-                                if len(result) < 1000
-                                else result.tail(100).to_dict("records")
-                            ),
+                            "data": dataframe_records(result, limit=100),
                         },
                         room=session_id,
                     )
 
-                time.sleep(0.1)
+                socketio.sleep(0.1)
 
             lahso_session.training_active = False
+            print(f"Training worker completed for session {session_id}", flush=True)
             socketio.emit(
                 "training_complete",
                 {
@@ -96,6 +111,10 @@ class BackgroundJobRunner:
 
         except Exception as exc:
             lahso_session.training_active = False
+            print(
+                f"Training worker failed for session {session_id}: {exc}",
+                flush=True,
+            )
             socketio.emit(
                 "training_error",
                 {"session_id": session_id, "error": str(exc)},
@@ -113,6 +132,16 @@ class BackgroundJobRunner:
             return
 
         try:
+            print(f"Implementation worker started for session {session_id}", flush=True)
+            socketio.emit(
+                "simulation_progress",
+                {
+                    "session_id": session_id,
+                    "data": [],
+                },
+                room=session_id,
+            )
+            socketio.sleep(0)
             simulation_gen = model_implementation(
                 lahso_session.config,
                 lahso_session.model_input,
@@ -123,18 +152,23 @@ class BackgroundJobRunner:
                     break
 
                 if result is not None:
+                    print(
+                        f"Implementation worker emitting progress for session {session_id}",
+                        flush=True,
+                    )
                     socketio.emit(
                         "simulation_progress",
                         {
                             "session_id": session_id,
-                            "data": result.to_dict("records"),
+                            "data": dataframe_records(result),
                         },
                         room=session_id,
                     )
 
-                time.sleep(0.5)
+                socketio.sleep(0.5)
 
             lahso_session.simulation_active = False
+            print(f"Implementation worker completed for session {session_id}", flush=True)
             socketio.emit(
                 "simulation_complete",
                 {
@@ -146,6 +180,10 @@ class BackgroundJobRunner:
 
         except Exception as exc:
             lahso_session.simulation_active = False
+            print(
+                f"Implementation worker failed for session {session_id}: {exc}",
+                flush=True,
+            )
             socketio.emit(
                 "simulation_error",
                 {"session_id": session_id, "error": str(exc)},
