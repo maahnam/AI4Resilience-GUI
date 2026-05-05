@@ -1,5 +1,10 @@
 
 # Tasks
+- make it such that on disconnect you get a different page on resume of trianing etc.
+- add a path where the model gets saved, same with the simulation scenario, maybe this could be a queue of files that the user gets notified about, they press download and then it downlaods? 
+- make the: live button, rhs status panel and the lhs menu disclaymer only happen in "dev mode"
+- make the drag and drop component way nicer
+- remove useless, "ai-ish fields", like: ...
 
 ## Svelte pages and components
 Right now there seems to only be 1 that contains everything, @+page.svelte.
@@ -224,3 +229,22 @@ Remaining for the next agent:
 - Decide whether uploaded files should be periodically cleaned from `artifacts/uploads/`; there is no retention or cleanup policy yet.
 - Literal folder picking for Results Comparison is still not implemented; current comparison flow uploads two policy CSV files directly.
 - The Svelte page is still largely monolithic in `frontend/src/routes/+page.svelte`; the component/page split from the first DEV task remains open.
+
+## Handoff Update - 2026-05-06 (route split and reusable Svelte 5 workflow components)
+- Completed the first DEV task to split the monolithic Svelte page into route-based workflow pages with client-side navigation.
+- `frontend/src/routes/+page.ts` now redirects `/` to `/training`, and the shell lives in `frontend/src/routes/+layout.svelte`.
+- Added dedicated workflow pages:
+  - `frontend/src/routes/training/+page.svelte`
+  - `frontend/src/routes/implementation/+page.svelte`
+  - `frontend/src/routes/comparison/+page.svelte`
+- Shared cross-route state now lives in `frontend/src/lib/state/lahso-workflow.svelte.ts`, provided through Svelte 5 context so navigation between routes keeps the live session, forms, and websocket state without full reloads.
+- Added reusable UI components for repeated workflow structure:
+  - `frontend/src/lib/components/WorkflowStepTabs.svelte`
+  - `frontend/src/lib/components/DatasetConfigurationForm.svelte`
+- Removed the old monolithic `frontend/src/routes/+page.svelte`.
+- Updated `tests/test_smoke_frontend_refactor.py` to assert the new route split, shared state/context, reusable dataset form, and continued Svelte 5/runes usage.
+
+Verification run:
+- `bun --bun run check` from `frontend/` -> 0 Svelte errors and 0 warnings. It still prints the local nvm/.npmrc warning before running.
+- `bun --bun run build` from `frontend/` -> production build completed successfully after moving the shared form proxies to valid top-level `$state(...)` declarations in `lahso-workflow.svelte.ts`.
+- `uv run pytest tests/test_smoke_frontend_refactor.py -q` -> 3 passed.

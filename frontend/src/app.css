@@ -69,6 +69,15 @@ button {
 	padding: 0 8px;
 }
 
+.brand-link,
+.nav-button {
+	text-decoration: none;
+}
+
+.brand-link {
+	color: inherit;
+}
+
 .brand-mark {
 	width: 38px;
 	height: 38px;

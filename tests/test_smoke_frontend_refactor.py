@@ -18,8 +18,27 @@ def test_sveltekit_frontend_uses_svelte_5_and_flask_api_contract() -> None:
     assert dev_dependencies["svelte"].startswith("^5.")
     assert dev_dependencies["svelte-adapter-bun"]
 
-    page_source = (FRONTEND_ROOT / "src" / "routes" / "+page.svelte").read_text()
+    layout_source = (FRONTEND_ROOT / "src" / "routes" / "+layout.svelte").read_text()
+    root_page_load = (FRONTEND_ROOT / "src" / "routes" / "+page.ts").read_text()
+    training_page_source = (
+        FRONTEND_ROOT / "src" / "routes" / "training" / "+page.svelte"
+    ).read_text()
+    implementation_page_source = (
+        FRONTEND_ROOT / "src" / "routes" / "implementation" / "+page.svelte"
+    ).read_text()
+    comparison_page_source = (
+        FRONTEND_ROOT / "src" / "routes" / "comparison" / "+page.svelte"
+    ).read_text()
     api_source = (FRONTEND_ROOT / "src" / "lib" / "api.ts").read_text()
+    workflow_state_source = (
+        FRONTEND_ROOT / "src" / "lib" / "state" / "lahso-workflow.svelte.ts"
+    ).read_text()
+    dataset_form_source = (
+        FRONTEND_ROOT / "src" / "lib" / "components" / "DatasetConfigurationForm.svelte"
+    ).read_text()
+    workflow_tabs_source = (
+        FRONTEND_ROOT / "src" / "lib" / "components" / "WorkflowStepTabs.svelte"
+    ).read_text()
     series_chart_source = (
         FRONTEND_ROOT / "src" / "lib" / "components" / "SeriesChart.svelte"
     ).read_text()
@@ -27,37 +46,63 @@ def test_sveltekit_frontend_uses_svelte_5_and_flask_api_contract() -> None:
     svelte_config = (FRONTEND_ROOT / "svelte.config.js").read_text()
     vite_config = (FRONTEND_ROOT / "vite.config.ts").read_text()
 
-    assert "$state(" in page_source
-    assert "$derived(" in page_source
-    assert "DragDropFileInput" in page_source
-    assert "bind:file={datasetForm.network}" in page_source
-    assert "id=\"implementation-dataset-network\"" in page_source
-    assert "onsubmit={submitImplementationDataset}" in page_source
-    assert "bind:file={trainingForm.service_disruptions}" in page_source
-    assert "bind:file={implementationForm.q_table}" in page_source
-    assert "bind:file={comparisonForm.file1}" in page_source
-    assert "bind:file={comparisonForm.file2}" in page_source
-    assert page_source.count('xAxisLabel="Episode"') == 3
-    assert 'yAxisLabel="Total Cost"' in page_source
-    assert 'yAxisLabel="Total Reward"' in page_source
+    page_sources = "\n".join(
+        [
+            layout_source,
+            training_page_source,
+            implementation_page_source,
+            comparison_page_source,
+            dataset_form_source,
+            workflow_tabs_source,
+        ]
+    )
+
+    assert "createContext" in workflow_state_source
+    assert "$state(" in workflow_state_source
+    assert "$derived(" in training_page_source
+    assert "$derived(" in implementation_page_source
+    assert 'href="/training"' in layout_source
+    assert "href: '/training'" in workflow_state_source
+    assert "href: '/implementation'" in workflow_state_source
+    assert "href: '/comparison'" in workflow_state_source
+    assert "throw redirect(307, '/training')" in root_page_load
+    assert "WorkflowStepTabs" in training_page_source
+    assert "WorkflowStepTabs" in implementation_page_source
+    assert "WorkflowStepTabs" in comparison_page_source
+    assert "DatasetConfigurationForm" in training_page_source
+    assert "DatasetConfigurationForm" in implementation_page_source
+    assert "bind:file={form.network}" in dataset_form_source
+    assert "bind:file={form.mode_costs}" in dataset_form_source
+    assert "bind:file={app.forms.training.service_disruptions}" in training_page_source
+    assert "bind:file={app.forms.implementation.q_table}" in implementation_page_source
+    assert "bind:file={app.forms.comparison.file1}" in comparison_page_source
+    assert "bind:file={app.forms.comparison.file2}" in comparison_page_source
+    assert (
+        training_page_source.count('xAxisLabel="Episode"')
+        + implementation_page_source.count('xAxisLabel="Episode"')
+        == 3
+    )
+    assert 'yAxisLabel="Total Cost"' in training_page_source
+    assert 'yAxisLabel="Total Reward"' in training_page_source
+    assert 'yAxisLabel="Total Cost"' in implementation_page_source
     assert "axisXTicks" in series_chart_source
     assert "axisYTicks" in series_chart_source
     assert 'class="x-axis-scale"' in series_chart_source
     assert 'class="y-axis-scale"' in series_chart_source
     assert ".x-axis-scale" in app_css
     assert ".y-axis-scale" in app_css
-    assert 'tone="blue"\n\t\t\t\t\t\t\t\temptyLabel' not in page_source
-    assert 'tone="amber"\n\t\t\t\t\t\t\t\temptyLabel' not in page_source
-    assert "const canControlTraining = $derived(trainingReady || trainingRunning)" in page_source
-    assert "payload.error === 'Training already active'" in page_source
-    assert "Controls are reconnected" in page_source
-    assert "disabled={!canControlTraining || trainingPaused}" in page_source
-    assert page_source.count("disabled={!canControlTraining}") == 2
-    assert "on:click" not in page_source
-    assert "on:submit" not in page_source
-    assert "syncSession(payload.session_id)" in page_source
-    assert "join_session" in page_source
-    assert "CSV Path" not in page_source
+    assert 'tone="blue"\n\t\t\temptyLabel' not in page_sources
+    assert 'tone="amber"\n\t\t\temptyLabel' not in page_sources
+    assert "let canControlTraining = $derived(app.readiness.trainingReady || app.run.trainingRunning)" in training_page_source
+    assert "payload.error === 'Training already active'" in workflow_state_source
+    assert "Controls are reconnected" in workflow_state_source
+    assert "disabled={!canControlTraining || app.run.trainingPaused}" in training_page_source
+    assert training_page_source.count("disabled={!canControlTraining}") == 2
+    assert "on:click" not in page_sources
+    assert "on:submit" not in page_sources
+    assert "syncSession(payload.session_id)" in workflow_state_source
+    assert "join_session" in workflow_state_source
+    assert "CSV Path" not in page_sources
     assert "FormData" in api_source
     assert "appendOptionalFile(formData, 'network'" in api_source
     assert "appendOptionalFile(formData, 'service_disruptions'" in api_source
