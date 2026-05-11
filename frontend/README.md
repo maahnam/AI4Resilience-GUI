@@ -17,7 +17,9 @@ bun --bun run dev
 ```
 
 Vite proxies `/api` and `/socket.io` to `http://127.0.0.1:5001`, which is the
-port used by the Flask runner.
+port used by the Flask runner. The `dev` script intentionally launches Vite
+with Node, even when invoked through Bun, because Vite's WebSocket proxy depends
+on Node socket APIs that are not fully compatible with Bun's dev-server runtime.
 
 ## Checking And Building
 

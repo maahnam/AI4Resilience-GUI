@@ -1,6 +1,6 @@
 import { createContext } from 'svelte';
 import type { Socket } from 'socket.io-client';
-import { api, apiBase } from '$lib/api';
+import { api, socketBase } from '$lib/api';
 import type {
 	ComparisonForm,
 	ComparisonStep,
@@ -153,7 +153,7 @@ export function createLahsoWorkflowState() {
 		void import('socket.io-client').then(({ io }) => {
 			if (disposed) return;
 
-			const client = io(apiBase || undefined, {
+			const client = io(socketBase || undefined, {
 				withCredentials: true,
 				transports: ['websocket', 'polling']
 			});

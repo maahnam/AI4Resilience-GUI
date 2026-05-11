@@ -12,11 +12,13 @@ def test_sveltekit_frontend_uses_svelte_5_and_flask_api_contract() -> None:
     package_json = json.loads((FRONTEND_ROOT / "package.json").read_text())
     dependencies = package_json.get("dependencies", {})
     dev_dependencies = package_json.get("devDependencies", {})
+    scripts = package_json.get("scripts", {})
 
     assert dependencies["socket.io-client"].startswith("^4.")
     assert dependencies["lucide-svelte"]
     assert dev_dependencies["svelte"].startswith("^5.")
     assert dev_dependencies["svelte-adapter-bun"]
+    assert scripts["dev"].startswith("node ./node_modules/vite/bin/vite.js dev")
 
     layout_source = (FRONTEND_ROOT / "src" / "routes" / "+layout.svelte").read_text()
     root_page_load = (FRONTEND_ROOT / "src" / "routes" / "+page.ts").read_text()
@@ -96,7 +98,7 @@ def test_sveltekit_frontend_uses_svelte_5_and_flask_api_contract() -> None:
     assert "let canControlTraining = $derived(app.readiness.trainingReady || app.run.trainingRunning)" in training_page_source
     assert "payload.error === 'Training already active'" in workflow_state_source
     assert "Controls are reconnected" in workflow_state_source
-    assert "io(apiBase || undefined" in workflow_state_source
+    assert "io(socketBase || undefined" in workflow_state_source
     assert "disabled={!canControlTraining || app.run.trainingPaused}" in training_page_source
     assert training_page_source.count("disabled={!canControlTraining}") == 2
     assert "on:click" not in page_sources
@@ -107,6 +109,8 @@ def test_sveltekit_frontend_uses_svelte_5_and_flask_api_contract() -> None:
     assert "FormData" in api_source
     assert "$env/dynamic/public" not in api_source
     assert "import.meta" in api_source
+    assert "PUBLIC_LAHSO_SOCKET_BASE" in api_source
+    assert "DEFAULT_DEV_BACKEND_BASE" not in api_source
     assert "appendOptionalFile(formData, 'network'" in api_source
     assert "appendOptionalFile(formData, 'service_disruptions'" in api_source
     assert "appendOptionalFile(formData, 'q_table'" in api_source
@@ -116,6 +120,7 @@ def test_sveltekit_frontend_uses_svelte_5_and_flask_api_contract() -> None:
     assert "runes:" in svelte_config
     assert "'/api': 'http://127.0.0.1:5001'" in vite_config
     assert "'/socket.io'" in vite_config
+    assert "ws: true" in vite_config
 
 
 def test_gradio_frontend_files_are_still_present() -> None:
@@ -136,4 +141,5 @@ def test_frontend_and_flask_runner_share_development_port_contract() -> None:
 
     assert "port=5001" in root_app
     assert "http://127.0.0.1:5001" in frontend_readme
+    assert "Vite's WebSocket proxy" in frontend_readme
     assert "bun --bun run dev" in frontend_readme

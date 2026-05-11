@@ -45,7 +45,9 @@ AI4Resilience-GUI/
 
 During local frontend development, Vite proxies `/api` and `/socket.io` to
 Flask on `http://127.0.0.1:5001`, which is the port used by
-`scripts/run_web.py`.
+`scripts/run_web.py`. The frontend dev script launches Vite with Node so the
+WebSocket proxy uses Node's complete socket APIs while Bun can still run the
+package script.
 
 ## Run the Model
 

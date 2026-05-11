@@ -13,7 +13,18 @@ type PublicImportMetaEnv = ImportMeta & {
 
 const publicEnv = (import.meta as PublicImportMetaEnv).env;
 
-export const apiBase = String(publicEnv.PUBLIC_LAHSO_API_BASE ?? '').replace(/\/$/, '');
+function envString(value: string | boolean | undefined): string {
+	return typeof value === 'string' ? value : '';
+}
+
+function trimTrailingSlash(value: string): string {
+	return value.replace(/\/$/, '');
+}
+
+export const apiBase = trimTrailingSlash(envString(publicEnv.PUBLIC_LAHSO_API_BASE));
+export const socketBase = trimTrailingSlash(
+	envString(publicEnv.PUBLIC_LAHSO_SOCKET_BASE) || apiBase
+);
 
 type RequestOptions = {
 	method?: 'GET' | 'POST';
