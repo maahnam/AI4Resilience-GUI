@@ -96,6 +96,7 @@ def test_sveltekit_frontend_uses_svelte_5_and_flask_api_contract() -> None:
     assert "let canControlTraining = $derived(app.readiness.trainingReady || app.run.trainingRunning)" in training_page_source
     assert "payload.error === 'Training already active'" in workflow_state_source
     assert "Controls are reconnected" in workflow_state_source
+    assert "io(apiBase || undefined" in workflow_state_source
     assert "disabled={!canControlTraining || app.run.trainingPaused}" in training_page_source
     assert training_page_source.count("disabled={!canControlTraining}") == 2
     assert "on:click" not in page_sources
@@ -104,6 +105,8 @@ def test_sveltekit_frontend_uses_svelte_5_and_flask_api_contract() -> None:
     assert "join_session" in workflow_state_source
     assert "CSV Path" not in page_sources
     assert "FormData" in api_source
+    assert "$env/dynamic/public" not in api_source
+    assert "import.meta" in api_source
     assert "appendOptionalFile(formData, 'network'" in api_source
     assert "appendOptionalFile(formData, 'service_disruptions'" in api_source
     assert "appendOptionalFile(formData, 'q_table'" in api_source

@@ -1,4 +1,3 @@
-import { env } from '$env/dynamic/public';
 import type {
 	ApiResponse,
 	ComparisonForm,
@@ -8,7 +7,13 @@ import type {
 	TrainingForm
 } from '$lib/types';
 
-export const apiBase = (env.PUBLIC_LAHSO_API_BASE ?? '').replace(/\/$/, '');
+type PublicImportMetaEnv = ImportMeta & {
+	env: Record<string, string | boolean | undefined>;
+};
+
+const publicEnv = (import.meta as PublicImportMetaEnv).env;
+
+export const apiBase = String(publicEnv.PUBLIC_LAHSO_API_BASE ?? '').replace(/\/$/, '');
 
 type RequestOptions = {
 	method?: 'GET' | 'POST';

@@ -1,6 +1,6 @@
 import { createContext } from 'svelte';
 import type { Socket } from 'socket.io-client';
-import { api } from '$lib/api';
+import { api, apiBase } from '$lib/api';
 import type {
 	ComparisonForm,
 	ComparisonStep,
@@ -130,12 +130,12 @@ export function createLahsoWorkflowState() {
 		label2: 'Greedy Policy'
 	});
 
-	const forms = {
+	const forms = $state({
 		dataset: datasetForm,
 		training: trainingForm,
 		implementation: implementationForm,
 		comparison: comparisonForm
-	};
+	});
 
 	const metrics = $state({
 		training: [] as TrainingMetric[],
@@ -153,7 +153,7 @@ export function createLahsoWorkflowState() {
 		void import('socket.io-client').then(({ io }) => {
 			if (disposed) return;
 
-			const client = io(undefined, {
+			const client = io(apiBase || undefined, {
 				withCredentials: true,
 				transports: ['websocket', 'polling']
 			});
