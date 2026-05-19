@@ -40,6 +40,24 @@ export type DefaultConfigPayload = ApiResponse<{
 	default_files: DefaultFiles;
 }>;
 
+export type ArtifactLink = {
+	id: string;
+	label: string;
+	kind: 'model' | 'training_metric' | 'simulation_output';
+	url: string;
+	path: string;
+};
+
+export type SessionStatusPayload = ApiResponse<{
+	session_id: string;
+	training_active: boolean;
+	simulation_active: boolean;
+	training_paused: boolean;
+	current_episode: number;
+	total_episodes: number;
+	artifacts: ArtifactLink[];
+}>;
+
 export type DatasetForm = {
 	network: File | null;
 	network_barge: File | null;
@@ -96,6 +114,8 @@ export type SimulationMetric = {
 	'Total Cost'?: number;
 	[key: string]: number | string | undefined;
 };
+
+export type ComparisonRow = Record<string, number | string | undefined>;
 
 export type TrainingProgress = {
 	session_id: string;

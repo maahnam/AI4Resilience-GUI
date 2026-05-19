@@ -23,6 +23,9 @@
 		}
 	]);
 	let simulationCostSeries = $derived(toSeries(app.metrics.simulation, 'Total Cost'));
+	let simulationArtifacts = $derived(
+		app.artifacts.files.filter((artifact) => artifact.kind === 'simulation_output')
+	);
 </script>
 
 <svelte:head>
@@ -146,5 +149,17 @@
 			yAxisLabel="Total Cost"
 			emptyLabel={app.run.simulationRunning ? 'Simulation is running' : 'Waiting for data'}
 		/>
+
+		{#if simulationArtifacts.length}
+			<div class="artifact-list">
+				<h2>Downloads</h2>
+				{#each simulationArtifacts as artifact (artifact.id)}
+					<div class="artifact-row">
+						<span>{artifact.label}</span>
+						<a href={artifact.url}>Download</a>
+					</div>
+				{/each}
+			</div>
+		{/if}
 	</div>
 {/if}

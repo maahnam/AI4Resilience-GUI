@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
+from pathlib import Path
 from threading import Lock
 from typing import Any
 
@@ -22,6 +23,7 @@ class LAHSOSession:
     training_paused: bool = False
     current_episode: int = 0
     total_episodes: int = 0
+    artifacts: list[dict[str, str]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -31,7 +33,29 @@ class LAHSOSession:
             "training_paused": self.training_paused,
             "current_episode": self.current_episode,
             "total_episodes": self.total_episodes,
+            "artifacts": self.artifacts,
         }
+
+    def upsert_artifact(self, label: str, path: Path, kind: str) -> None:
+        artifact = {
+            "id": f"{kind}:{path.name}",
+            "label": label,
+            "kind": kind,
+            "path": str(path),
+            "url": f"/api/artifacts/{kind}:{path.name}",
+        }
+        self.artifacts = [
+            existing
+            for existing in self.artifacts
+            if existing["id"] != artifact["id"]
+        ]
+        self.artifacts.append(artifact)
+
+    def artifact_path(self, artifact_id: str) -> Path | None:
+        for artifact in self.artifacts:
+            if artifact["id"] == artifact_id:
+                return Path(artifact["path"])
+        return None
 
 
 class SessionStore:

@@ -1,9 +1,11 @@
 import type {
 	ApiResponse,
 	ComparisonForm,
+	ComparisonRow,
 	DatasetForm,
 	DefaultConfigPayload,
 	ImplementationForm,
+	SessionStatusPayload,
 	TrainingForm
 } from '$lib/types';
 
@@ -64,6 +66,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
 export const api = {
 	getDefaultConfig: () => request<DefaultConfigPayload>('/api/config/default'),
+	getSessionStatus: () => request<SessionStatusPayload>('/api/session/status'),
 	validateDataset: (payload: DatasetForm) =>
 		request<ApiResponse<{ kbest_generated: boolean }>>('/api/dataset/validate', {
 			method: 'POST',
@@ -106,7 +109,7 @@ export const api = {
 		formData.append('label1', payload.label1);
 		formData.append('label2', payload.label2);
 
-		return request<ApiResponse<{ comparison_data: Record<string, unknown>[] }>>(
+		return request<ApiResponse<{ comparison_data: ComparisonRow[] }>>(
 			'/api/comparison/compare',
 			{
 				method: 'POST',

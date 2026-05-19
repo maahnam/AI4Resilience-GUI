@@ -12,7 +12,6 @@ from lahso.config import Config
 from lahso.paths import (
     Q_TABLES_DIR,
     RAW_DISRUPTIONS_DIR,
-    TRAINING_METRICS_DIR,
     UPLOADS_DIR,
     ensure_directories,
     project_relative,
@@ -143,6 +142,7 @@ def configure_training(
     lahso_session.config.extract_q_table = 1
     continue_training = _as_bool(payload.get("continue_training"), default=False)
     lahso_session.config.start_from_0 = not continue_training
+    output_dir = _session_output_dir(lahso_session)
 
     if continue_training:
         last_q_table_upload = _save_upload(
@@ -170,13 +170,9 @@ def configure_training(
         if last_reward_upload is not None:
             lahso_session.config.tr_path = last_reward_upload
     else:
-        lahso_session.config.q_table_path = Q_TABLES_DIR / "default_q_table_output.pkl"
-        lahso_session.config.tc_path = (
-            TRAINING_METRICS_DIR / "default_total_cost_output.pkl"
-        )
-        lahso_session.config.tr_path = (
-            TRAINING_METRICS_DIR / "default_total_reward_output.pkl"
-        )
+        lahso_session.config.q_table_path = output_dir / "trained_q_table.pkl"
+        lahso_session.config.tc_path = output_dir / "training_total_cost.pkl"
+        lahso_session.config.tr_path = output_dir / "training_total_reward.pkl"
 
     lahso_session.total_episodes = lahso_session.config.number_of_simulation
     lahso_session.model_input = ModelInput(lahso_session.config)
@@ -208,6 +204,7 @@ def configure_implementation(
         CSV_SUFFIXES,
     )
     q_table_upload = _save_upload(lahso_session, files, "q_table", PKL_SUFFIXES)
+    output_dir = _session_output_dir(lahso_session)
 
     config = Config(
         s_disruption_path=(
@@ -224,6 +221,7 @@ def configure_implementation(
         q_table_path=q_table_upload or Q_TABLES_DIR / "default_q_table_output.pkl",
         policy_name=payload.get("policy", "gp"),
         extract_shipment_output=True,
+        output_path=output_dir / f"{payload.get('policy', 'gp')}_simulation_output.csv",
     )
 
     _copy_dataset_config(lahso_session.config, config)
@@ -326,6 +324,12 @@ def _save_upload(
 def _session_upload_dir(lahso_session: LAHSOSession) -> Path:
     session_slug = secure_filename(lahso_session.session_id) or "session"
     return UPLOADS_DIR / session_slug
+
+
+def _session_output_dir(lahso_session: LAHSOSession) -> Path:
+    output_dir = _session_upload_dir(lahso_session) / "outputs"
+    ensure_directories(output_dir)
+    return output_dir
 
 
 def _configure_session_generated_dataset_paths(

@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, abort, jsonify, render_template, request, send_file
 from flask_socketio import SocketIO
 from jinja2 import TemplateNotFound
 
@@ -38,6 +38,22 @@ def register_routes(
             return jsonify(get_default_config_payload())
         except Exception as exc:
             return _json_error(exc)
+
+    @app.route("/api/session/status", methods=["GET"])
+    def get_session_status():
+        try:
+            lahso_session = session_store.get_for_current_request()
+            return jsonify({"success": True, **lahso_session.to_dict()})
+        except Exception as exc:
+            return _json_error(exc)
+
+    @app.route("/api/artifacts/<path:artifact_id>", methods=["GET"])
+    def download_artifact(artifact_id: str):
+        lahso_session = session_store.get_for_current_request()
+        artifact_path = lahso_session.artifact_path(artifact_id)
+        if artifact_path is None or not artifact_path.exists():
+            abort(404)
+        return send_file(artifact_path, as_attachment=True)
 
     @app.route("/api/dataset/validate", methods=["POST"])
     def validate_dataset_route():

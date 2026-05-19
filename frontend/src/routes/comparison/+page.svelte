@@ -1,10 +1,18 @@
 <script lang="ts">
 	import { BarChart3 } from 'lucide-svelte';
+	import DeltaBarChart from '$lib/components/DeltaBarChart.svelte';
 	import DragDropFileInput from '$lib/components/DragDropFileInput.svelte';
 	import WorkflowStepTabs from '$lib/components/WorkflowStepTabs.svelte';
 	import { useLahsoWorkflow } from '$lib/state/lahso-workflow.svelte';
 
 	const app = useLahsoWorkflow();
+	const comparisonCharts = [
+		{ title: 'Storage Cost Comparison', metricKey: 'Total Storage Cost Delta' },
+		{ title: 'Delay Penalty Comparison', metricKey: 'Total Delay Penalty Delta' },
+		{ title: 'Handling Cost Comparison', metricKey: 'Total Handling Cost Delta' },
+		{ title: 'Travel Cost Comparison', metricKey: 'Total Travel Cost Delta' },
+		{ title: 'Total Cost Comparison', metricKey: 'Total Cost Delta' }
+	];
 
 	let comparisonSteps = $derived([
 		{ id: 'files', label: 'Policy Files' },
@@ -64,24 +72,57 @@
 		</div>
 	</form>
 {:else if comparisonPreviewRows.length}
-	<table class="comparison-table">
-		<thead>
-			<tr>
-				{#each Object.keys(comparisonPreviewRows[0]) as key (key)}
-					<th>{key}</th>
+	<div class="comparison-results">
+		<section class="comparison-chart-section">
+			<h2>Comparison For Each Cost Parameter</h2>
+			<div class="chart-grid">
+				{#each comparisonCharts.slice(0, 4) as chart (chart.metricKey)}
+					<DeltaBarChart
+						title={chart.title}
+						rows={app.metrics.comparison}
+						metricKey={chart.metricKey}
+						label1={app.forms.comparison.label1}
+						label2={app.forms.comparison.label2}
+					/>
 				{/each}
-			</tr>
-		</thead>
-		<tbody>
-			{#each comparisonPreviewRows as row, index (index)}
-				<tr>
-					{#each Object.values(row) as value, cellIndex (cellIndex)}
-						<td>{String(value)}</td>
-					{/each}
-				</tr>
-			{/each}
-		</tbody>
-	</table>
+			</div>
+		</section>
+
+		<section class="comparison-chart-section">
+			<h2>Total Cost For Each Simulation Episode</h2>
+			<DeltaBarChart
+				title={comparisonCharts[4].title}
+				rows={app.metrics.comparison}
+				metricKey={comparisonCharts[4].metricKey}
+				label1={app.forms.comparison.label1}
+				label2={app.forms.comparison.label2}
+			/>
+		</section>
+
+		<section class="comparison-table-section">
+			<h2>Comparison Data Preview</h2>
+			<div class="table-scroll">
+				<table class="comparison-table">
+					<thead>
+						<tr>
+							{#each Object.keys(comparisonPreviewRows[0]) as key (key)}
+								<th>{key}</th>
+							{/each}
+						</tr>
+					</thead>
+					<tbody>
+						{#each comparisonPreviewRows as row, index (index)}
+							<tr>
+								{#each Object.values(row) as value, cellIndex (cellIndex)}
+									<td>{String(value)}</td>
+								{/each}
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			</div>
+		</section>
+	</div>
 {:else}
 	<div class="empty-state">Run a comparison to preview the result rows.</div>
 {/if}

@@ -212,6 +212,10 @@ button {
 	align-items: start;
 }
 
+.workspace-grid.full-width {
+	grid-template-columns: minmax(0, 1fr);
+}
+
 .work-surface,
 .side-surface {
 	background: #ffffff;
@@ -631,6 +635,24 @@ button:disabled {
 	gap: 16px;
 }
 
+.comparison-results,
+.comparison-chart-section,
+.comparison-table-section {
+	display: grid;
+	gap: 16px;
+}
+
+.comparison-results {
+	gap: 22px;
+}
+
+.comparison-chart-section h2,
+.comparison-table-section h2 {
+	margin: 0;
+	font-size: 17px;
+	line-height: 1.25;
+}
+
 .series-chart {
 	min-height: 268px;
 	border-radius: 8px;
@@ -642,19 +664,22 @@ button:disabled {
 	gap: 12px;
 }
 
-.series-chart header {
+.series-chart header,
+.delta-bar-chart header {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
 	gap: 12px;
 }
 
-.series-chart h3 {
+.series-chart h3,
+.delta-bar-chart h3 {
 	margin: 0;
 	font-size: 15px;
 }
 
-.series-chart header span {
+.series-chart header span,
+.delta-bar-chart header span {
 	color: #64748b;
 	font-size: 13px;
 	font-weight: 700;
@@ -816,6 +841,74 @@ button:disabled {
 	fill: rgba(217, 119, 6, 0.15);
 }
 
+.delta-bar-chart {
+	min-height: 292px;
+	border-radius: 8px;
+	border: 1px solid #dbe3ee;
+	background: #ffffff;
+	padding: 16px;
+	display: grid;
+	grid-template-rows: auto auto 1fr;
+	gap: 10px;
+}
+
+.delta-legend {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 14px;
+	color: #475569;
+	font-size: 12px;
+	font-weight: 700;
+	line-height: 1.2;
+}
+
+.delta-legend span {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	min-width: 0;
+}
+
+.delta-legend i {
+	width: 10px;
+	height: 10px;
+	border-radius: 2px;
+	flex: 0 0 auto;
+}
+
+.delta-frame {
+	min-height: 194px;
+}
+
+.delta-zero-line {
+	stroke: #0f172a;
+	stroke-width: 1.4;
+	stroke-dasharray: 3 3;
+	vector-effect: non-scaling-stroke;
+}
+
+.policy-one {
+	fill: #2563eb;
+	background: #2563eb;
+}
+
+.policy-two {
+	fill: #d97706;
+	background: #d97706;
+}
+
+.policy-even {
+	fill: #94a3b8;
+	background: #94a3b8;
+}
+
+.table-scroll {
+	width: 100%;
+	overflow-x: auto;
+	border: 1px solid #e2e8f0;
+	border-radius: 8px;
+}
+
 .comparison-table {
 	width: 100%;
 	border-collapse: collapse;
@@ -834,6 +927,11 @@ button:disabled {
 	background: #f8fafc;
 	font-size: 12px;
 	text-transform: uppercase;
+	white-space: nowrap;
+}
+
+.comparison-table td {
+	white-space: nowrap;
 }
 
 .empty-state {
@@ -845,6 +943,69 @@ button:disabled {
 	color: #64748b;
 	text-align: center;
 	padding: 24px;
+}
+
+.disconnect-panel {
+	min-height: 320px;
+	display: grid;
+	place-items: center;
+	align-content: center;
+	gap: 14px;
+	text-align: center;
+	padding: 28px;
+}
+
+.disconnect-panel h2 {
+	margin: 0;
+	font-size: 24px;
+	line-height: 1.2;
+}
+
+.disconnect-panel p {
+	max-width: 520px;
+	margin: 0;
+	color: #64748b;
+	line-height: 1.55;
+}
+
+.artifact-list {
+	display: grid;
+	gap: 10px;
+	margin-top: 16px;
+}
+
+.artifact-list h2 {
+	margin: 0;
+	font-size: 17px;
+}
+
+.artifact-row {
+	min-height: 48px;
+	border: 1px solid #dbe3ee;
+	border-radius: 8px;
+	padding: 10px 12px;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.artifact-row span {
+	min-width: 0;
+	font-weight: 700;
+	color: #172033;
+	overflow-wrap: anywhere;
+}
+
+.artifact-row a {
+	color: #0f766e;
+	font-weight: 700;
+	text-decoration: none;
+	white-space: nowrap;
+}
+
+.artifact-row a:hover {
+	text-decoration: underline;
 }
 
 @media (max-width: 1050px) {

@@ -3,9 +3,11 @@ import type { Socket } from 'socket.io-client';
 import { api, socketBase } from '$lib/api';
 import type {
 	ComparisonForm,
+	ComparisonRow,
 	ComparisonStep,
 	DatasetForm,
 	DefaultFiles,
+	ArtifactLink,
 	ImplementationForm,
 	ImplementationStep,
 	MainWorkflow,
@@ -48,8 +50,6 @@ export const navItems: NavItem[] = [
 	}
 ];
 
-type ComparisonRow = Record<string, unknown>;
-
 export type LahsoWorkflowState = ReturnType<typeof createLahsoWorkflowState>;
 
 export const [useLahsoWorkflow, setLahsoWorkflow] = createContext<LahsoWorkflowState>();
@@ -59,6 +59,7 @@ export function createLahsoWorkflowState() {
 		defaultFiles: null as DefaultFiles | null,
 		sessionId: '',
 		socketConnected: false,
+		connectionInterrupted: false,
 		loadingConfig: true,
 		feedbackMessage: 'Loading backend defaults...',
 		feedbackTone: 'neutral' as FeedbackTone
@@ -143,6 +144,10 @@ export function createLahsoWorkflowState() {
 		comparison: [] as ComparisonRow[]
 	});
 
+	const artifacts = $state({
+		files: [] as ArtifactLink[]
+	});
+
 	let socket: Socket | null = null;
 
 	function mount() {
@@ -163,14 +168,18 @@ export function createLahsoWorkflowState() {
 			client.on('connected', (payload: { session_id: string }) => {
 				status.socketConnected = true;
 				syncSession(status.sessionId || payload.session_id);
+				status.connectionInterrupted = false;
+				void refreshSessionStatus();
 			});
 			client.on('disconnect', () => {
 				status.socketConnected = false;
+				status.connectionInterrupted = run.trainingRunning || run.simulationRunning;
 			});
 			client.on('training_progress', handleTrainingProgress);
-			client.on('training_complete', (payload: { message?: string }) => {
+			client.on('training_complete', (payload: { message?: string; artifacts?: ArtifactLink[] }) => {
 				run.trainingRunning = false;
 				run.trainingPaused = false;
+				mergeArtifacts(payload.artifacts);
 				setFeedback(payload.message ?? 'Training completed successfully.', 'good');
 			});
 			client.on('training_error', (payload: { error?: string }) => {
@@ -179,8 +188,9 @@ export function createLahsoWorkflowState() {
 				setFeedback(payload.error ?? 'Training failed.', 'error');
 			});
 			client.on('simulation_progress', handleSimulationProgress);
-			client.on('simulation_complete', (payload: { message?: string }) => {
+			client.on('simulation_complete', (payload: { message?: string; artifacts?: ArtifactLink[] }) => {
 				run.simulationRunning = false;
+				mergeArtifacts(payload.artifacts);
 				setFeedback(payload.message ?? 'Simulation completed successfully.', 'good');
 			});
 			client.on('simulation_error', (payload: { error?: string }) => {
@@ -214,10 +224,35 @@ export function createLahsoWorkflowState() {
 			forms.implementation.simulation_duration = payload.config.impl_duration;
 			run.totalEpisodes = payload.config.num_simulations;
 			setFeedback('Backend defaults loaded.', 'good');
+			await refreshSessionStatus();
 		} catch (error) {
 			setFeedback(errorMessage(error, 'Unable to load backend defaults.'), 'error');
 		} finally {
 			status.loadingConfig = false;
+		}
+	}
+
+	async function refreshSessionStatus() {
+		try {
+			const payload = await api.getSessionStatus();
+			if (!payload.success) {
+				setFeedback(payload.error ?? 'Unable to refresh session status.', 'error');
+				return;
+			}
+
+			syncSession(payload.session_id);
+			run.trainingRunning = payload.training_active;
+			run.trainingPaused = payload.training_paused;
+			run.simulationRunning = payload.simulation_active;
+			run.trainingEpisode = payload.current_episode;
+			run.totalEpisodes = payload.total_episodes || run.totalEpisodes;
+			artifacts.files = payload.artifacts;
+			status.connectionInterrupted = false;
+			if (payload.training_active || payload.simulation_active) {
+				setFeedback('Reconnected to active backend session.', 'good');
+			}
+		} catch (error) {
+			setFeedback(errorMessage(error, 'Unable to refresh session status.'), 'error');
 		}
 	}
 
@@ -442,12 +477,14 @@ export function createLahsoWorkflowState() {
 		run.trainingEpisode = payload.episode;
 		run.totalEpisodes = payload.total_episodes;
 		metrics.training = payload.data;
+		status.connectionInterrupted = false;
 	}
 
 	function handleSimulationProgress(payload: SimulationProgress) {
 		if (status.sessionId && payload.session_id !== status.sessionId) return;
 
 		metrics.simulation = payload.data;
+		status.connectionInterrupted = false;
 	}
 
 	function syncSession(nextSessionId?: string) {
@@ -509,6 +546,16 @@ export function createLahsoWorkflowState() {
 		status.feedbackTone = tone;
 	}
 
+	function mergeArtifacts(nextArtifacts: ArtifactLink[] | undefined) {
+		if (!nextArtifacts?.length) return;
+
+		const byId = new Map(artifacts.files.map((artifact) => [artifact.id, artifact]));
+		for (const artifact of nextArtifacts) {
+			byId.set(artifact.id, artifact);
+		}
+		artifacts.files = Array.from(byId.values());
+	}
+
 	function errorMessage(error: unknown, fallback: string) {
 		return error instanceof Error ? error.message : fallback;
 	}
@@ -520,8 +567,10 @@ export function createLahsoWorkflowState() {
 		steps,
 		forms,
 		metrics,
+		artifacts,
 		mount,
 		loadDefaults,
+		refreshSessionStatus,
 		submitDataset,
 		submitImplementationDataset,
 		submitTrainingSettings,

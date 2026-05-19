@@ -62,6 +62,8 @@ Datasets/
 csv_output/
 q_table/
 training/
+!frontend/src/routes/training/
+!frontend/src/routes/training/**
 shipment_logs/
 service_logs/
 

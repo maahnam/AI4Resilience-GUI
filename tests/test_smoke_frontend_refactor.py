@@ -41,6 +41,9 @@ def test_sveltekit_frontend_uses_svelte_5_and_flask_api_contract() -> None:
     workflow_tabs_source = (
         FRONTEND_ROOT / "src" / "lib" / "components" / "WorkflowStepTabs.svelte"
     ).read_text()
+    delta_bar_chart_source = (
+        FRONTEND_ROOT / "src" / "lib" / "components" / "DeltaBarChart.svelte"
+    ).read_text()
     series_chart_source = (
         FRONTEND_ROOT / "src" / "lib" / "components" / "SeriesChart.svelte"
     ).read_text()
@@ -71,6 +74,15 @@ def test_sveltekit_frontend_uses_svelte_5_and_flask_api_contract() -> None:
     assert "WorkflowStepTabs" in training_page_source
     assert "WorkflowStepTabs" in implementation_page_source
     assert "WorkflowStepTabs" in comparison_page_source
+    assert "DeltaBarChart" in comparison_page_source
+    assert "Total Storage Cost Delta" in comparison_page_source
+    assert "Total Delay Penalty Delta" in comparison_page_source
+    assert "Total Handling Cost Delta" in comparison_page_source
+    assert "Total Travel Cost Delta" in comparison_page_source
+    assert "Total Cost Delta" in comparison_page_source
+    assert "policy-one" in delta_bar_chart_source
+    assert "policy-two" in delta_bar_chart_source
+    assert ".delta-bar-chart" in app_css
     assert "DatasetConfigurationForm" in training_page_source
     assert "DatasetConfigurationForm" in implementation_page_source
     assert "bind:file={form.network}" in dataset_form_source

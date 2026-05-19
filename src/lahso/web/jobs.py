@@ -99,12 +99,14 @@ class BackgroundJobRunner:
                 socketio.sleep(0.1)
 
             lahso_session.training_active = False
+            self._register_training_artifacts(lahso_session)
             print(f"Training worker completed for session {session_id}", flush=True)
             socketio.emit(
                 "training_complete",
                 {
                     "session_id": session_id,
                     "message": "Training completed successfully",
+                    "artifacts": lahso_session.artifacts,
                 },
                 room=session_id,
             )
@@ -168,12 +170,14 @@ class BackgroundJobRunner:
                 socketio.sleep(0.5)
 
             lahso_session.simulation_active = False
+            self._register_simulation_artifacts(lahso_session)
             print(f"Implementation worker completed for session {session_id}", flush=True)
             socketio.emit(
                 "simulation_complete",
                 {
                     "session_id": session_id,
                     "message": "Simulation completed successfully",
+                    "artifacts": lahso_session.artifacts,
                 },
                 room=session_id,
             )
@@ -188,4 +192,23 @@ class BackgroundJobRunner:
                 "simulation_error",
                 {"session_id": session_id, "error": str(exc)},
                 room=session_id,
+            )
+
+    def _register_training_artifacts(self, lahso_session) -> None:
+        artifact_paths = (
+            ("Trained Q-table", lahso_session.config.q_table_path, "model"),
+            ("Training total cost", lahso_session.config.tc_path, "training_metric"),
+            ("Training total reward", lahso_session.config.tr_path, "training_metric"),
+        )
+        for label, path, kind in artifact_paths:
+            if path and path.exists():
+                lahso_session.upsert_artifact(label, path, kind)
+
+    def _register_simulation_artifacts(self, lahso_session) -> None:
+        output_path = lahso_session.config.output_path
+        if output_path and output_path.exists():
+            lahso_session.upsert_artifact(
+                "Simulation output",
+                output_path,
+                "simulation_output",
             )
